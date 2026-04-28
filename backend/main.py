@@ -93,6 +93,7 @@ def make_placeholder_narrative(facts) -> str:
 def run_pipeline(job_id: str, req: GenerateRequest):
     import sys
     sys.path.insert(0, str(Path(__file__).parent))
+    sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
     try:
         update_job(job_id, status="running", message="Loading ENR data...", progress=5)
