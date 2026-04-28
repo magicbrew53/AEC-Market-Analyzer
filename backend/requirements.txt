@@ -6,6 +6,6 @@ pandas==2.2.2
 openpyxl==3.1.5
 matplotlib==3.9.2
 rapidfuzz==3.9.7
-anthropic==0.34.2
+anthropic>=0.40.0
 requests==2.32.3
 python-multipart==0.0.12

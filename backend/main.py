@@ -59,7 +59,7 @@ class GenerateRequest(BaseModel):
     base_year: int = 2025
     no_narrative: bool = False
     no_forecast: bool = False
-    model: str = "claude-sonnet-4-6"
+    model: str = "claude-sonnet-4-6-20250514"
 
 
 def update_job(job_id: str, **kwargs):
@@ -197,7 +197,7 @@ def run_pipeline(job_id: str, req: GenerateRequest):
                     sector_narratives[sector_key] = render_sector_narrative(facts, model=req.model)
                 except Exception as e:
                     logging.warning("LLM error for %s: %s", sector_label, e)
-                    sector_narratives[sector_key] = make_placeholder_narrative(facts)
+                    sector_narratives[sector_key] = f"**[LLM error for {sector_label}: {e}]**\n\n" + make_placeholder_narrative(facts)
             else:
                 sector_narratives[sector_key] = make_placeholder_narrative(facts)
 
