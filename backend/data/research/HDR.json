@@ -1,0 +1,43 @@
+{
+  "firmShort": "HDR",
+  "firmLegalName": "HDR Inc.",
+  "primaryColorHex": "D62828",
+  "atAGlance": [
+    "Headquarters: Omaha, Nebraska",
+    "Founded: 1917 (108 years)",
+    "CEO: John W. Henderson, PE (appointed January 2024)",
+    "Chairman: Eric L. Keen, PE (Chairman since 2024; CEO 2017–2024)",
+    "President & COO: Neil Graff",
+    "Employees: 13,000+ employee-owners worldwide",
+    "Offices: 200+ locations in 10 countries",
+    "Ownership: 100% employee-owned (ESOP since 1996)"
+  ],
+  "ownership": "HDR's 108-year history reflects a transformation from a small Nebraska engineering firm to a global top-10 powerhouse.\n\nHenningson Engineering Company was founded in Omaha in 1917, designing power stations and municipal infrastructure. The firm was renamed Henningson, Durham & Richardson in the 1950s after partners purchased shares.\n\nIn 1983, Bouygues SA (France's largest construction company) acquired HDR for $60 million. In 1996, an employee group completed a management buyout for $55 million under CEO Dick Bell, establishing the 100% ESOP structure that remains today. The 2010s saw global expansion through 60+ acquisitions, with new offices established in Australia, Canada, China, Germany, the UK, and UAE. HDR celebrated its centennial in 2017 under CEO Eric Keen, who handed off the chief executive role to John Henderson — the ninth in company history — in 2024.",
+  "acquisitions": "HDR has completed more than 60 acquisitions since the 2010s, focused on geographic expansion, sector deepening (notably Power, Telecom, and Water), and adding specialized technical capabilities. Notable transactions include Hurley Palmer Flatt (2019), which seeded HDR's data-center and Telecom practice from effective zero to over $300M in 2025.",
+  "strategicInitiative": {
+    "name": "Active Growth scenario (February 2026 strategy report)",
+    "launchYear": 2026,
+    "goals": "Targeting $5.5–6.0B by 2029 via 3–5 acquisitions and 15+ strategic hires; 3.5% Power-sector share of ENR composite by 2029",
+    "growthOrgLeaders": [
+      "John W. Henderson (CEO)",
+      "Eric L. Keen (Chairman)",
+      "Neil Graff (President & COO)"
+    ]
+  },
+  "awards": [],
+  "fmiTargets": {
+    "power": {
+      "share2029": 0.035,
+      "rationale": "Active Growth scenario; ~$823M revenue at projected 2029 market size, requiring ~$445M net-new Power revenue via organic growth and mid-tier transmission/BESS/offshore-wind acquisitions"
+    },
+    "transportation": {
+      "share2029": null,
+      "rationale": "Maintain dominant share; current 3.85% is HDR's highest absolute market share in any sector"
+    },
+    "telecom": {
+      "share2029": null,
+      "rationale": "Build on Hurley Palmer Flatt acquisition; 5.00% share in 2025 is materially above HDR's 2.37% blended share"
+    }
+  },
+  "notes": "HDR is the proof-case for Don Sherman's BD methodology — sustained outperformance through multiple cycles, counter-cyclical 2009 market-share capture, and deliberate sector diversification. Source data is the AEC Market Masters HDR Market Analysis & BD Overview (Feb 17, 2026) and HDR Growth Opportunities & Strategic Approach (Feb 23, 2026)."
+}

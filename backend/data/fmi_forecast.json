@@ -1,0 +1,20 @@
+{
+  "publishedDate": "<date FMI report was published>",
+  "source": "<e.g. FMI Q1 2026 North American E&C Industry Forecast>",
+  "forecastYear": 2026,
+  "rates": {
+    "_comment": "Annual nominal-revenue growth rate for each sector. Edit per FMI quarterly report. Set to null to use trailing-CAGR fallback.",
+    "total": 0.046,
+    "intl": 0.03,
+    "gen_bldg": 0.04,
+    "manufacturing": 0.025,
+    "power": 0.05,
+    "water_supply": 0.06,
+    "sewer_waste": 0.055,
+    "ind_pet": 0.02,
+    "transportation": 0.04,
+    "haz_waste": 0.015,
+    "telecom": 0.25,
+    "other": 0.03
+  }
+}
