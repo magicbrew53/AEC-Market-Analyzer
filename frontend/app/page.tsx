@@ -157,6 +157,14 @@ export default function Home() {
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
+  function deleteFromHistory(id: string) {
+    setHistory((prev) => {
+      const next = prev.filter((j) => j.id !== id);
+      localStorage.setItem("rwa_history", JSON.stringify(next));
+      return next;
+    });
+  }
+
   const completedHistory = history.filter(
     (j) => j.status === "complete" && j.id !== activeJob?.id
   );
@@ -261,11 +269,20 @@ export default function Home() {
                   <div className="history-firm">{j.firmName}</div>
                   <div className="history-meta">{new Date(j.createdAt).toLocaleString()}</div>
                 </div>
-                {j.downloadUrl && (
-                  <a className="history-link" href={j.downloadUrl} download={j.filename}>
-                    Download
-                  </a>
-                )}
+                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                  {j.downloadUrl && (
+                    <a className="history-link" href={j.downloadUrl} download={j.filename}>
+                      Download
+                    </a>
+                  )}
+                  <button
+                    onClick={() => deleteFromHistory(j.id)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: "0.8rem", padding: 0 }}
+                    title="Remove from history"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))}
           </div>
