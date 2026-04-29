@@ -265,24 +265,22 @@ export default function Home() {
             <h2>Recent Reports</h2>
             {completedHistory.map((j) => (
               <div className="history-item" key={j.id}>
-                <div>
+                <div style={{ flex: 1 }}>
                   <div className="history-firm">{j.firmName}</div>
                   <div className="history-meta">{new Date(j.createdAt).toLocaleString()}</div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "row", gap: "0.75rem", alignItems: "center" }}>
-                  {j.downloadUrl && (
-                    <a className="history-link" href={j.downloadUrl} download={j.filename}>
-                      Download
-                    </a>
-                  )}
-                  <a
-                    className="history-link"
-                    onClick={() => deleteFromHistory(j.id)}
-                    style={{ cursor: "pointer", color: "var(--danger)" }}
-                  >
-                    Delete
+                {j.downloadUrl && (
+                  <a className="history-link" href={j.downloadUrl} download={j.filename} style={{ marginRight: "1rem" }}>
+                    Download
                   </a>
-                </div>
+                )}
+                <a
+                  className="history-link"
+                  onClick={() => deleteFromHistory(j.id)}
+                  style={{ cursor: "pointer", color: "var(--danger)" }}
+                >
+                  Delete
+                </a>
               </div>
             ))}
           </div>
