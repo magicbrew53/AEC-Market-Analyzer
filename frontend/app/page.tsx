@@ -277,10 +277,10 @@ export default function Home() {
                   )}
                   <button
                     onClick={() => deleteFromHistory(j.id)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: "0.8rem", padding: 0 }}
+                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 4, cursor: "pointer", color: "var(--muted)", fontSize: "0.75rem", padding: "2px 7px", lineHeight: 1.4 }}
                     title="Remove from history"
                   >
-                    ✕
+                    Delete
                   </button>
                 </div>
               </div>
