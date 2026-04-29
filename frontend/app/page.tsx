@@ -269,19 +269,19 @@ export default function Home() {
                   <div className="history-firm">{j.firmName}</div>
                   <div className="history-meta">{new Date(j.createdAt).toLocaleString()}</div>
                 </div>
-                <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <div style={{ display: "flex", flexDirection: "row", gap: "0.75rem", alignItems: "center" }}>
                   {j.downloadUrl && (
                     <a className="history-link" href={j.downloadUrl} download={j.filename}>
                       Download
                     </a>
                   )}
-                  <button
+                  <a
+                    className="history-link"
                     onClick={() => deleteFromHistory(j.id)}
-                    style={{ background: "none", border: "1px solid var(--border)", borderRadius: 4, cursor: "pointer", color: "var(--muted)", fontSize: "0.75rem", padding: "2px 7px", lineHeight: 1.4 }}
-                    title="Remove from history"
+                    style={{ cursor: "pointer", color: "var(--danger)" }}
                   >
                     Delete
-                  </button>
+                  </a>
                 </div>
               </div>
             ))}
