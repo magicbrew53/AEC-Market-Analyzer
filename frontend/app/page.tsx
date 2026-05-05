@@ -12,9 +12,28 @@ interface Job {
   filename?: string;
   error?: string;
   createdAt: string;
+  reportType?: ReportType;
 }
 
+type ReportType = "market-analysis" | "business-case";
+
 const POLL_INTERVAL = 4000;
+
+const SECTOR_OPTIONS: { value: string; label: string }[] = [
+  { value: "",                            label: "Auto-pick (flattest vs. composite)" },
+  { value: "water_supply,sewer_waste",    label: "Water (combined: Water Supply + Sewer/Waste)" },
+  { value: "gen_bldg,manufacturing",      label: "Building & Industrial (General Building + Manufacturing)" },
+  { value: "water_supply",                label: "Water Supply" },
+  { value: "sewer_waste",                 label: "Sewer/Waste Water" },
+  { value: "gen_bldg",                    label: "General Building" },
+  { value: "manufacturing",               label: "Manufacturing" },
+  { value: "power",                       label: "Power" },
+  { value: "transportation",              label: "Transportation" },
+  { value: "ind_pet",                     label: "Industrial/Petroleum" },
+  { value: "haz_waste",                   label: "Hazardous Waste" },
+  { value: "telecom",                     label: "Telecommunications" },
+  { value: "other",                       label: "Other" },
+];
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -25,13 +44,15 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function JobStatusCard({ job }: { job: Job }) {
+  const reportLabel =
+    job.reportType === "business-case" ? "RevWin Business Case" : "Market Analysis";
   return (
     <div className="status-card">
       <div className="status-header">
         <div>
           <strong>{job.firmName}</strong>
           <div className="history-meta" style={{ marginTop: 2 }}>
-            {new Date(job.createdAt).toLocaleString()}
+            {reportLabel} · {new Date(job.createdAt).toLocaleString()}
           </div>
         </div>
         <StatusBadge status={job.status} />
@@ -57,18 +78,25 @@ function JobStatusCard({ job }: { job: Job }) {
 }
 
 export default function Home() {
+  const [reportType, setReportType] = useState<ReportType>("market-analysis");
   const [firmName, setFirmName] = useState("");
+
+  // Market Analysis options
   const [spanStart, setSpanStart] = useState(2005);
   const [spanEnd, setSpanEnd] = useState(2025);
   const [baseYear, setBaseYear] = useState(2025);
   const [noNarrative, setNoNarrative] = useState(false);
   const [noForecast, setNoForecast] = useState(false);
+
+  // Business Case options
+  const [bcSector, setBcSector] = useState<string>(""); // "" = auto-pick
+  const [bcTargetYear, setBcTargetYear] = useState<string>(""); // empty = use research file or default
+
   const [loading, setLoading] = useState(false);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [history, setHistory] = useState<Job[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load history from localStorage on mount
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem("rwa_history") ?? "[]");
@@ -84,13 +112,14 @@ export default function Home() {
     });
   }
 
-  function startPolling(jobId: string) {
+  function startPolling(jobId: string, type: ReportType) {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(`/api/jobs/${jobId}`);
         if (!res.ok) return;
         const job: Job = await res.json();
+        job.reportType = type;
         setActiveJob(job);
         saveToHistory(job);
         if (job.status === "complete" || job.status === "failed") {
@@ -108,11 +137,35 @@ export default function Home() {
     setLoading(true);
     setActiveJob(null);
 
+    const initialMessage =
+      reportType === "business-case"
+        ? "Picking sector and computing ROI…"
+        : "Queued…";
+
     try {
-      const res = await fetch("/api/generate", {
+      let endpoint: string;
+      let payload: Record<string, unknown>;
+
+      if (reportType === "business-case") {
+        endpoint = "/api/business-case";
+        const targetYearNum = bcTargetYear.trim() ? Number(bcTargetYear) : null;
+        payload = {
+          firmName,
+          sector: bcSector || null,
+          targetYear: targetYearNum,
+          noNarrative,
+        };
+      } else {
+        endpoint = "/api/generate";
+        payload = {
+          firmName, spanStart, spanEnd, baseYear, noNarrative, noForecast,
+        };
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firmName, spanStart, spanEnd, baseYear, noNarrative, noForecast }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Unknown error");
@@ -122,27 +175,33 @@ export default function Home() {
         firmName,
         status: "pending",
         progress: 0,
-        message: "Queued...",
+        message: initialMessage,
         createdAt: new Date().toISOString(),
+        reportType,
       };
       setActiveJob(job);
       saveToHistory(job);
-      startPolling(data.jobId);
+      startPolling(data.jobId, reportType);
     } catch (err: unknown) {
       setLoading(false);
+      // Surface the real backend error — picker may legitimately fail when no
+      // sectors pass size/share filters, and the user needs to know to override.
       setActiveJob({
         id: "error",
         firmName,
         status: "failed",
         progress: 0,
-        message: "Failed to start job.",
-        error: String(err),
+        message:
+          reportType === "business-case"
+            ? "Business case generation failed."
+            : "Failed to start job.",
+        error: err instanceof Error ? err.message : String(err),
         createdAt: new Date().toISOString(),
+        reportType,
       });
     }
   }
 
-  // Resume polling for any in-progress job from history on load
   useEffect(() => {
     const inProgress = history.find(
       (j) => j.status === "pending" || j.status === "running"
@@ -150,7 +209,7 @@ export default function Home() {
     if (inProgress && !pollRef.current) {
       setActiveJob(inProgress);
       setLoading(true);
-      startPolling(inProgress.id);
+      startPolling(inProgress.id, inProgress.reportType ?? "market-analysis");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -168,6 +227,11 @@ export default function Home() {
   const completedHistory = history.filter(
     (j) => j.status === "complete" && j.id !== activeJob?.id
   );
+
+  const submitLabel =
+    reportType === "business-case"
+      ? loading ? "Generating Business Case…" : "Generate RevWin Business Case"
+      : loading ? "Generating…" : "Generate Market Analysis";
 
   return (
     <>
@@ -192,69 +256,160 @@ export default function Home() {
               />
             </div>
 
-            <div className="options-grid">
-              <div>
-                <label htmlFor="spanStart">Span Start</label>
-                <input
-                  id="spanStart"
-                  type="number"
-                  min={2005}
-                  max={spanEnd - 1}
-                  value={spanStart}
-                  onChange={(e) => setSpanStart(Number(e.target.value))}
+            <div style={{ marginTop: "1rem" }}>
+              <label>Report Type</label>
+              <div
+                role="radiogroup"
+                aria-label="Report Type"
+                style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={reportType === "market-analysis"}
+                  onClick={() => setReportType("market-analysis")}
                   disabled={loading}
-                />
-              </div>
-              <div>
-                <label htmlFor="spanEnd">Span End</label>
-                <input
-                  id="spanEnd"
-                  type="number"
-                  min={spanStart + 1}
-                  max={2025}
-                  value={spanEnd}
-                  onChange={(e) => setSpanEnd(Number(e.target.value))}
+                  className={reportType === "market-analysis" ? "primary" : ""}
+                  style={{ flex: 1 }}
+                >
+                  Market Analysis (50-page benchmark)
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={reportType === "business-case"}
+                  onClick={() => setReportType("business-case")}
                   disabled={loading}
-                />
-              </div>
-              <div>
-                <label htmlFor="baseYear">Base Year (Real $)</label>
-                <input
-                  id="baseYear"
-                  type="number"
-                  min={2000}
-                  max={2030}
-                  value={baseYear}
-                  onChange={(e) => setBaseYear(Number(e.target.value))}
-                  disabled={loading}
-                />
+                  className={reportType === "business-case" ? "primary" : ""}
+                  style={{ flex: 1 }}
+                >
+                  RevWin Business Case (4–6 page sales doc)
+                </button>
               </div>
             </div>
 
-            <div className="checkbox-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={noNarrative}
-                  onChange={(e) => setNoNarrative(e.target.checked)}
-                  disabled={loading}
-                />
-                Skip AI narratives (faster)
-              </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={noForecast}
-                  onChange={(e) => setNoForecast(e.target.checked)}
-                  disabled={loading}
-                />
-                Skip forecast row
-              </label>
-            </div>
+            {reportType === "market-analysis" && (
+              <>
+                <div className="options-grid">
+                  <div>
+                    <label htmlFor="spanStart">Span Start</label>
+                    <input
+                      id="spanStart"
+                      type="number"
+                      min={2005}
+                      max={spanEnd - 1}
+                      value={spanStart}
+                      onChange={(e) => setSpanStart(Number(e.target.value))}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="spanEnd">Span End</label>
+                    <input
+                      id="spanEnd"
+                      type="number"
+                      min={spanStart + 1}
+                      max={2025}
+                      value={spanEnd}
+                      onChange={(e) => setSpanEnd(Number(e.target.value))}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="baseYear">Base Year (Real $)</label>
+                    <input
+                      id="baseYear"
+                      type="number"
+                      min={2000}
+                      max={2030}
+                      value={baseYear}
+                      onChange={(e) => setBaseYear(Number(e.target.value))}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="checkbox-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={noNarrative}
+                      onChange={(e) => setNoNarrative(e.target.checked)}
+                      disabled={loading}
+                    />
+                    Skip AI narratives (faster)
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={noForecast}
+                      onChange={(e) => setNoForecast(e.target.checked)}
+                      disabled={loading}
+                    />
+                    Skip forecast row
+                  </label>
+                </div>
+              </>
+            )}
+
+            {reportType === "business-case" && (
+              <>
+                <div className="options-grid">
+                  <div style={{ gridColumn: "1 / span 2" }}>
+                    <label htmlFor="bcSector">Sector override</label>
+                    <select
+                      id="bcSector"
+                      value={bcSector}
+                      onChange={(e) => setBcSector(e.target.value)}
+                      disabled={loading}
+                    >
+                      {SECTOR_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="bcTargetYear">Target year (optional)</label>
+                    <input
+                      id="bcTargetYear"
+                      type="number"
+                      min={2026}
+                      max={2040}
+                      placeholder="default: 2029"
+                      value={bcTargetYear}
+                      onChange={(e) => setBcTargetYear(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div className="checkbox-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={noNarrative}
+                      onChange={(e) => setNoNarrative(e.target.checked)}
+                      disabled={loading}
+                    />
+                    Skip AI narratives (faster, free)
+                  </label>
+                </div>
+              </>
+            )}
 
             <button className="primary" type="submit" disabled={loading || !firmName.trim()}>
-              {loading ? "Generating…" : "Generate Report"}
+              {submitLabel}
             </button>
+
+            {reportType === "business-case" && !noNarrative && (
+              <div
+                style={{
+                  marginTop: "0.5rem", fontSize: "0.85rem", color: "#666",
+                }}
+              >
+                ~$0.06 in API costs per report (3 LLM calls).
+              </div>
+            )}
           </form>
         </div>
 
@@ -266,7 +421,14 @@ export default function Home() {
             {completedHistory.map((j) => (
               <div className="history-item" key={j.id}>
                 <div style={{ flex: 1 }}>
-                  <div className="history-firm">{j.firmName}</div>
+                  <div className="history-firm">
+                    {j.firmName}
+                    {j.reportType === "business-case" && (
+                      <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", color: "#888" }}>
+                        Business Case
+                      </span>
+                    )}
+                  </div>
                   <div className="history-meta">{new Date(j.createdAt).toLocaleString()}</div>
                 </div>
                 {j.downloadUrl && (

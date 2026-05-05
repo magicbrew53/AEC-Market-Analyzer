@@ -62,6 +62,14 @@ class GenerateRequest(BaseModel):
     model: str = "claude-sonnet-4-6-20250514"
 
 
+class BusinessCaseRequest(BaseModel):
+    firm_name: str
+    sector: Optional[str] = None         # None | "power" | "water_supply,sewer_waste"
+    target_year: Optional[int] = None    # None means "use research file or default"
+    no_narrative: bool = False
+    model: str = "claude-sonnet-4-6-20250514"
+
+
 def update_job(job_id: str, **kwargs):
     fields = ", ".join(f'"{k}" = %s' for k in kwargs)
     values = list(kwargs.values()) + [job_id]
@@ -333,6 +341,161 @@ def run_pipeline(job_id: str, req: GenerateRequest):
         )
 
 
+def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
+    """Generate a 4-6 page RevWin Business Case .docx for one firm."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent))
+    sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+    try:
+        update_job(job_id, status="running",
+                   message="Picking sector and computing ROI...", progress=10)
+
+        from lib.ingest import build_panel, load_cci_annual
+        from lib.resolve import resolve as resolve_fn, get_firm_panel
+        from lib.charts import build_composite_by_year
+        from lib.research import load_research
+        from lib.forecast import load_fmi_forecast
+        from lib.docx_render import SECTION_ORDER, SECTOR_PRIMARY_HEX
+        from lib.business_case import (
+            assemble_business_case, load_pilot_assumptions,
+        )
+        from lib.docx_render_bc import (
+            build_business_case_spec, render_business_case_docx,
+        )
+
+        panel = build_panel(DATA_DIR / "enr")
+        cci = load_cci_annual(DATA_DIR / "cci.xlsx", base_year=2025)
+        cci_lookup = dict(zip(cci["year"], cci["deflator"]))
+        composite_by_year = build_composite_by_year(panel)
+        fmi = load_fmi_forecast(DATA_DIR / "fmi_forecast.json")
+        assumptions = load_pilot_assumptions(DATA_DIR / "revwin_pilot_assumptions.json")
+
+        try:
+            match = resolve_fn(
+                panel, req.firm_name,
+                user_cache_path=DATA_DIR / "user_aliases.json",
+                interactive=False,
+            )
+        except ValueError:
+            update_job(job_id, status="failed",
+                       message=f"Firm '{req.firm_name}' not found in ENR data.")
+            return
+
+        firm_data = get_firm_panel(panel, match)
+        if firm_data.empty:
+            update_job(job_id, status="failed",
+                       message=f"No ENR data rows found for '{req.firm_name}'.")
+            return
+
+        actual_start = max(2005, int(firm_data["data_year"].min()))
+        actual_end = min(2025, int(firm_data["data_year"].max()))
+        firm_short = match.firm_keys[0] if match.firm_keys else req.firm_name.upper()
+
+        research = load_research(DATA_DIR / "research" / f"{firm_short}.json")
+
+        forced_keys = None
+        if req.sector:
+            forced_keys = [k.strip() for k in req.sector.split(",") if k.strip()]
+
+        try:
+            bc = assemble_business_case(
+                firm_data=firm_data,
+                composite_by_year=composite_by_year,
+                section_order=SECTION_ORDER,
+                firm_short=firm_short,
+                firm_legal_name=(research.firmLegalName if research else None),
+                primary_color_hex=(research.primaryColorHex if research and research.primaryColorHex
+                                   else SECTOR_PRIMARY_HEX["total"]),
+                cci_lookup=cci_lookup,
+                base_year=2025,
+                start_year=actual_start,
+                end_year=actual_end,
+                fmi_forecast=fmi,
+                assumptions=assumptions,
+                research=research,
+                forced_sector_keys=forced_keys,
+                target_year_override=req.target_year,
+            )
+        except ValueError as e:
+            update_job(job_id, status="failed", message=str(e))
+            return
+
+        # --- Narratives (3 LLM calls) ---
+        use_llm = (not req.no_narrative) and bool(os.environ.get("ANTHROPIC_API_KEY"))
+        if use_llm:
+            update_job(job_id, progress=45,
+                       message="Drafting narrative (3 LLM calls, ~30 seconds)...")
+            from lib.narrative import (
+                render_bc_opportunity, render_bc_why_sector, render_bc_the_ask,
+            )
+            try:
+                opportunity_md = render_bc_opportunity(bc, model=req.model)
+            except Exception as e:
+                logging.warning("BC Opportunity LLM error: %s", e)
+                opportunity_md = f"**[LLM error generating Opportunity: {e}]**"
+            try:
+                why_sector_md = render_bc_why_sector(bc, model=req.model)
+            except Exception as e:
+                logging.warning("BC Why Sector LLM error: %s", e)
+                why_sector_md = f"**[LLM error generating Why Sector: {e}]**"
+            try:
+                the_ask_md = render_bc_the_ask(bc, model=req.model)
+            except Exception as e:
+                logging.warning("BC The Ask LLM error: %s", e)
+                the_ask_md = f"**[LLM error generating The Ask: {e}]**"
+        else:
+            opportunity_md = (
+                "**[Placeholder — Opportunity narrative requires the LLM.]**"
+            )
+            why_sector_md = (
+                f"**[Placeholder — Why {bc.sector_pick.display_label} First requires the LLM.]**"
+            )
+            the_ask_md = (
+                "**[Placeholder — The Ask paragraph requires the LLM.]**"
+            )
+
+        update_job(job_id, progress=85, message="Assembling document...")
+        spec = build_business_case_spec(
+            bc=bc,
+            primary_color_hex=(research.primaryColorHex if research and research.primaryColorHex
+                               else SECTOR_PRIMARY_HEX["total"]),
+            opportunity_md=opportunity_md,
+            why_sector_md=why_sector_md,
+            the_ask_md=the_ask_md,
+            publish_date=date.today().strftime("%B %d, %Y"),
+        )
+
+        sector_slug = bc.sector_pick.display_label.replace(" ", "_").replace("/", "_")
+        sector_slug = "".join(c for c in sector_slug if c.isalnum() or c == "_")
+        filename = f"{firm_short}_{sector_slug}_BusinessCase_{date.today().strftime('%Y_%m_%d')}.docx"
+        out_path = OUTPUT_DIR / filename
+        render_business_case_docx(spec, out_path)
+
+        download_url = upload_to_blob(out_path, filename)
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
+
+        update_job(
+            job_id,
+            status="complete",
+            progress=100,
+            message="Report ready.",
+            downloadUrl=download_url,
+            filename=filename,
+        )
+
+    except Exception:
+        update_job(
+            job_id,
+            status="failed",
+            message="Pipeline error.",
+            error=traceback.format_exc()[:2000],
+        )
+
+
 def upload_to_blob(file_path: Path, filename: str) -> str:
     import requests
     blob_token = os.environ["BLOB_READ_WRITE_TOKEN"]
@@ -369,6 +532,24 @@ def generate(req: GenerateRequest, x_api_secret: Optional[str] = Header(None)):
             )
         conn.commit()
     thread = threading.Thread(target=run_pipeline, args=(job_id, req), daemon=True)
+    thread.start()
+    return {"jobId": job_id}
+
+
+@app.post("/generate-business-case")
+def generate_business_case(req: BusinessCaseRequest, x_api_secret: Optional[str] = Header(None)):
+    require_auth(x_api_secret)
+    job_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                '''INSERT INTO "Job" (id, "firmName", status, progress, message, "createdAt", "updatedAt")
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)''',
+                (job_id, req.firm_name, "pending", 0, "Queued business case...", now, now),
+            )
+        conn.commit()
+    thread = threading.Thread(target=run_business_case_pipeline, args=(job_id, req), daemon=True)
     thread.start()
     return {"jobId": job_id}
 

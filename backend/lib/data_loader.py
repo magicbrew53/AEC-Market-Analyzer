@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 BLOB_BASE = "https://blob.vercel-storage.com"
 ENR_PREFIX = "enr-data/"
-STATIC_FILES = ["cci.xlsx", "fmi_forecast.json"]
+STATIC_FILES = ["cci.xlsx", "fmi_forecast.json", "revwin_pilot_assumptions.json"]
 
 
 def _blob_token() -> str:
