@@ -78,6 +78,7 @@ class FirmResearch:
     fmiTargets: dict = field(default_factory=dict)
     notes: Optional[str] = None  # any extra freeform notes for the LLM
     aliasOverrides: list[str] = field(default_factory=list)  # firm_keys to UNION for this firm
+    revwinPilot: dict = field(default_factory=dict)  # per-sector pilot assumption overrides
 
     @property
     def has_profile(self) -> bool:
@@ -115,6 +116,7 @@ def load_research(path: Path | None) -> FirmResearch | None:
         fmiTargets=raw.get("fmiTargets", {}),
         notes=raw.get("notes"),
         aliasOverrides=raw.get("aliasOverrides", []),
+        revwinPilot=raw.get("revwinPilot", {}),
     )
 
 

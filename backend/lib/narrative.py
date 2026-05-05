@@ -364,6 +364,182 @@ def render_conclusions(
     return _call_llm(prompt, api_key, model, max_tokens)
 
 
+# =====================================================================
+#  RevWin Business Case narratives — three short LLM-generated passages.
+#  Each takes a BusinessCaseInputs object, builds a strict facts JSON,
+#  and asks Claude for a constrained piece of prose. Voice: Don Sherman.
+# =====================================================================
+
+
+_BC_VOICE_GUARDRAILS = (
+    "Voice: Don Sherman — analytical, plain-spoken, no hype, no metaphors, no consultant "
+    "jargon. Cite ONLY numbers from the facts JSON. Do not invent specific dollar values, "
+    "percentages, named drivers (regulations, projects, deal names), executive names, or "
+    "firm history. If a number isn't in the facts, do not write a number. If a driver isn't "
+    "in the facts, do not name one."
+)
+
+
+BC_OPPORTUNITY_PROMPT = """You are writing the **Opportunity** section of a 4-6 page \
+RevWin Business Case for **{firm_short}** in the **{sector_display}** sector.
+
+{voice_guardrails}
+
+Format requirements:
+  - 1 to 2 paragraphs, 100-200 words total
+  - Markdown, no headings (the section heading is added separately)
+  - Lead with the addressable market growth — this sector grows from the {end_year} \
+size (`market_projection.end_year_m`) to the {target_year} size (`market_projection.target_year_m`).
+  - Anchor on {firm_short}'s current revenue (`current_combined_revenue_m`) and current share \
+(derive from primary_sector.end_share_pct, plus secondary_sector.end_share_pct if bundled).
+  - If `active_growth.has_explicit_target` is true, state the target_revenue_m as the \
+{target_year} goal and the net_new_required_m as what must be added to get there.
+  - If `active_growth.has_explicit_target` is false, frame the opportunity as participating \
+in a funded market without gaining ground in real terms — quantify the real-CAGR gap from \
+`primary_sector.delta_pp` (and secondary_sector.delta_pp when bundled).
+  - Conclude with: this is achievable through consistent capture-planning execution at \
+pursuit volume, not occasional must-win heroics.
+
+Facts:
+
+```json
+{facts_json}
+```
+
+Now write the prose only — no preamble, no postscript, no markdown fences.
+"""
+
+
+BC_WHY_SECTOR_PROMPT = """You are writing the **Why {sector_display} First** section of a \
+RevWin Business Case for **{firm_short}**.
+
+{voice_guardrails}
+
+Format requirements:
+  - 3 to 5 short paragraphs, each beginning with a brief **bold lead phrase.**
+  - 200-350 words total
+  - Markdown, no headings (the section heading is added separately)
+
+Themes to draw from (use only when the data in the facts supports them — skip themes \
+that aren't supported):
+
+  1. **High pursuit volume with repeatable buyer architecture.** This is universal for \
+any sector picked — pursuit-planning lift compounds where the firm runs a steady volume \
+of similar pursuits with similar buyers.
+
+  2. **Stabilized but not-yet-gaining share — clean measurement baseline.** Use this when \
+`primary_sector.delta_pp` is small in magnitude (within ~1.0pp of zero). The firm is \
+neither gaining nor losing ground in real terms, which makes any pilot lift cleanly \
+attributable to the methodology rather than a sector tailwind.
+
+  3. **Imminent acquisition or expansion cycle.** Use ONLY if the research notes (visible \
+in the facts via the parent prompt — but you do not have that here) clearly establish a \
+named acquisition or expansion cycle. If the facts do not mention one, do not invent one.
+
+  4. **Cultural fit / firm history with the methodology.** Use ONLY if the facts establish \
+prior history with the methodology. Do not invent prior engagements.
+
+Default to themes 1 and 2 unless the facts clearly support 3 or 4.
+
+Facts:
+
+```json
+{facts_json}
+```
+
+Now write the prose only — no preamble, no postscript, no markdown fences.
+"""
+
+
+BC_THE_ASK_PROMPT = """You are writing the closing **The Ask** section of a RevWin Business \
+Case for **{firm_short}** in the **{sector_display}** sector.
+
+{voice_guardrails}
+
+Format requirements:
+  - 1 paragraph, 80-150 words
+  - Markdown, no headings (the section heading is added separately)
+  - Propose a specific 60-minute working session.
+  - If `growth_org_leaders` is non-empty, name 1-2 of those leaders as suggested attendees. \
+Otherwise reference "{firm_short} {sector_display} Business Group leadership" generically.
+  - Specify what AEC Market Masters provides (the platform, an onboarding intensive in \
+weeks 0-2, and embedded coaching through the {pilot_duration_quarters}-quarter pilot) \
+and what the firm provides (pursuit-team time and access to historical pursuit data).
+  - Close on the bottom-line framing: a {pilot_duration_quarters}-quarter Mid-scenario \
+pilot returns roughly the Mid scenario's incremental_fee_revenue_m on the Mid scenario's \
+pilot_cost_m — quote those numbers from `roi_scenarios[1]`.
+
+Facts:
+
+```json
+{facts_json}
+```
+
+Now write the prose only — no preamble, no postscript, no markdown fences.
+"""
+
+
+def _bc_render(prompt: str, *, api_key: str | None, model: str, max_tokens: int) -> str:
+    return _call_llm(prompt, api_key, model, max_tokens)
+
+
+def render_bc_opportunity(
+    bc_inputs,
+    *,
+    api_key: str | None = None,
+    model: str = "claude-sonnet-4-6",
+    max_tokens: int = 800,
+) -> str:
+    """Generate the Opportunity narrative for a Business Case."""
+    facts = bc_inputs.to_facts_dict()
+    prompt = BC_OPPORTUNITY_PROMPT.format(
+        firm_short=bc_inputs.firm_short,
+        sector_display=bc_inputs.sector_pick.display_label,
+        end_year=bc_inputs.end_year,
+        target_year=bc_inputs.target_year,
+        voice_guardrails=_BC_VOICE_GUARDRAILS,
+        facts_json=json.dumps(facts, indent=2, default=str),
+    )
+    return _bc_render(prompt, api_key=api_key, model=model, max_tokens=max_tokens)
+
+
+def render_bc_why_sector(
+    bc_inputs,
+    *,
+    api_key: str | None = None,
+    model: str = "claude-sonnet-4-6",
+    max_tokens: int = 1000,
+) -> str:
+    """Generate the Why-Sector narrative for a Business Case."""
+    facts = bc_inputs.to_facts_dict()
+    prompt = BC_WHY_SECTOR_PROMPT.format(
+        firm_short=bc_inputs.firm_short,
+        sector_display=bc_inputs.sector_pick.display_label,
+        voice_guardrails=_BC_VOICE_GUARDRAILS,
+        facts_json=json.dumps(facts, indent=2, default=str),
+    )
+    return _bc_render(prompt, api_key=api_key, model=model, max_tokens=max_tokens)
+
+
+def render_bc_the_ask(
+    bc_inputs,
+    *,
+    api_key: str | None = None,
+    model: str = "claude-sonnet-4-6",
+    max_tokens: int = 600,
+) -> str:
+    """Generate the closing Ask paragraph for a Business Case."""
+    facts = bc_inputs.to_facts_dict()
+    prompt = BC_THE_ASK_PROMPT.format(
+        firm_short=bc_inputs.firm_short,
+        sector_display=bc_inputs.sector_pick.display_label,
+        pilot_duration_quarters=bc_inputs.pilot_duration_quarters,
+        voice_guardrails=_BC_VOICE_GUARDRAILS,
+        facts_json=json.dumps(facts, indent=2, default=str),
+    )
+    return _bc_render(prompt, api_key=api_key, model=model, max_tokens=max_tokens)
+
+
 if __name__ == "__main__":
     import sys
     from pathlib import Path
