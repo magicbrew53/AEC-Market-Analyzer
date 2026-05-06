@@ -21,5 +21,12 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Public routes (skipped by basic auth):
+  //   /business-case        — embedded as iframe on revwin.ai
+  //   /api/business-case    — POST endpoint the iframe calls
+  //   /api/jobs/<id>        — status polling for the iframe's running job
+  //   _next/static, _next/image, favicon.ico — static assets
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|business-case|api/business-case|api/jobs).*)",
+  ],
 };
