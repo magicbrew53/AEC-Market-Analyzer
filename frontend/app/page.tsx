@@ -401,7 +401,11 @@ export default function Home() {
                       value={bcPilotVolume}
                       onChange={(e) => setBcPilotVolume(e.target.value)}
                       disabled={loading}
+                      title="Number of pursuits the team will run through the coached capture workflow during the pilot. Conservative scenario will be ~67% of this value; Aggressive ~133%."
                     />
+                    <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 4 }}>
+                      Pursuits coached during the pilot. Sector defaults: Water 75 · Power 60 · Building 90.
+                    </div>
                   </div>
                   <div>
                     <label htmlFor="bcWinRateUplift">Win-rate uplift (pp, Mid)</label>
@@ -415,7 +419,11 @@ export default function Home() {
                       value={bcWinRateUplift}
                       onChange={(e) => setBcWinRateUplift(e.target.value)}
                       disabled={loading}
+                      title="Percentage-point improvement in win rate vs. baseline. e.g., entering 12 means a 30% baseline becomes 42%. Conservative ~67% of this; Aggressive ~125%."
                     />
+                    <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 4 }}>
+                      Points added to baseline win rate (e.g. 12 = 30% → 42%). Sector default: 12.
+                    </div>
                   </div>
                   <div>
                     <label htmlFor="bcPilotDuration">Pilot duration (quarters)</label>
@@ -428,12 +436,16 @@ export default function Home() {
                       value={bcPilotDuration}
                       onChange={(e) => setBcPilotDuration(e.target.value)}
                       disabled={loading}
+                      title="Length of the pilot in quarters. Drives the Timeline section in the document. Default 6 quarters = 18 months."
                     />
+                    <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 4 }}>
+                      How long the pilot runs. Default 6 quarters (18 months).
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ marginTop: "-0.5rem", fontSize: "0.8rem", color: "#888" }}>
-                  Mid-scenario overrides; Conservative and Aggressive scale proportionally.
+                <div style={{ marginTop: "0.25rem", fontSize: "0.8rem", color: "#888" }}>
+                  These are <strong>Mid-scenario</strong> values — Conservative and Aggressive in the ROI table scale proportionally around them.
                 </div>
 
                 <div className="checkbox-row">

@@ -741,6 +741,27 @@ def assemble_business_case(
         always_include=forced_sector_keys,
     )
 
+    # 2b. Auto-pick fallback: if no sector passed the filter and the user
+    #     didn't force one, pick the sector where the firm is weakest (smallest
+    #     real-CAGR delta vs. composite) regardless of size. This handles
+    #     small firms where every sector falls below the $50M / 1% threshold.
+    fell_back_no_filter = False
+    if not candidates and not forced_sector_keys:
+        all_pilot_keys = [k for k, _ in section_order if k not in ("total", "intl")]
+        candidates = rank_sectors(
+            firm_data=firm_data,
+            composite_by_year=composite_by_year,
+            section_order=section_order,
+            firm_short=firm_short,
+            cci_lookup=cci_lookup,
+            base_year=base_year,
+            start_year=start_year,
+            end_year=end_year,
+            thresholds=assumptions.filter_thresholds,
+            always_include=all_pilot_keys,
+        )
+        fell_back_no_filter = True
+
     # 3. Pick sector
     pick = pick_sector(
         candidates=candidates,
@@ -748,6 +769,15 @@ def assemble_business_case(
         forced_keys=forced_sector_keys,
         firm_short=firm_short,
     )
+
+    if fell_back_no_filter:
+        pick.rationale = (
+            "(Below-filter fallback) " + pick.rationale +
+            f" Note: every sector for {firm_short} falls below the standard "
+            f"size/share filter ($50M revenue, 1% share); the picker selected "
+            f"the sector where the firm is weakest relative to the ENR Composite "
+            f"regardless of absolute scale."
+        )
 
     # 4. Project market
     projection = project_target_market_size(
