@@ -113,12 +113,22 @@ _SUCCESS_METRICS = [
 ]
 
 
-_TIMELINE_ROWS = [
-    ("Weeks 0-2",   "Onboarding intensive: methodology training, platform configuration, historical-pursuit data import, baseline win-rate measurement."),
-    ("Weeks 2-8",   "Embed: every in-scope pursuit runs through the coached capture workflow. Weekly pursuit-captain sessions; daily Slack-channel coaching."),
-    ("Weeks 8-26",  "Steady-state pilot: pursuit teams operate with platform support, AEC Market Masters coaches the highest-stakes pursuits, monthly leadership reviews track win-rate evolution."),
-    ("Week 26",     "Pilot retrospective: same-mix win-rate measurement vs. baseline, qualitative debrief, decision on full-firm rollout."),
-]
+def _build_timeline_rows(duration_quarters: int) -> list[tuple[str, str]]:
+    """Scale phase boundaries to the actual pilot duration (quarters × 13 weeks)."""
+    total_weeks = max(13, duration_quarters * 13)
+    onboarding_end = 2
+    embed_end = min(8, max(4, total_weeks // 4))
+    steady_end = max(embed_end + 1, total_weeks - 1)
+    return [
+        (f"Weeks 0-{onboarding_end}",
+         "Onboarding intensive: methodology training, platform configuration, historical-pursuit data import, baseline win-rate measurement."),
+        (f"Weeks {onboarding_end}-{embed_end}",
+         "Embed: every in-scope pursuit runs through the coached capture workflow. Weekly pursuit-captain sessions; daily Slack-channel coaching."),
+        (f"Weeks {embed_end}-{steady_end}",
+         "Steady-state pilot: pursuit teams operate with platform support, AEC Market Masters coaches the highest-stakes pursuits, monthly leadership reviews track win-rate evolution."),
+        (f"Week {total_weeks}",
+         "Pilot retrospective: same-mix win-rate measurement vs. baseline, qualitative debrief, decision on full-firm rollout."),
+    ]
 
 
 def _format_pilot_scope_rows(bc: BusinessCaseInputs) -> list[tuple[str, str]]:
@@ -239,7 +249,10 @@ def build_business_case_spec(
         for s in bc.roi_table.scenarios
     ]
 
-    timeline_rows = [{"phase": phase, "detail": detail} for phase, detail in _TIMELINE_ROWS]
+    timeline_rows = [
+        {"phase": phase, "detail": detail}
+        for phase, detail in _build_timeline_rows(bc.pilot_duration_quarters)
+    ]
 
     leaders = []
     if bc.research and getattr(bc.research, "strategicInitiative", None):

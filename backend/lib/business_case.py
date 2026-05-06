@@ -514,8 +514,17 @@ def build_roi_table(
     sector_keys: list[str],
     assumptions: PilotAssumptions,
     per_firm_override: Optional[dict] = None,
+    pilot_volume_mid_override: Optional[int] = None,
+    win_rate_uplift_mid_pp_override: Optional[float] = None,
+    pilot_duration_quarters_override: Optional[int] = None,
 ) -> RoiTable:
-    """Build the 3-scenario ROI table using the primary sector's economics."""
+    """Build the 3-scenario ROI table using the primary sector's economics.
+
+    The Mid-scenario overrides scale the Conservative and Aggressive scenarios
+    proportionally, preserving the relative spread baked into the assumption
+    arrays. (e.g., if the original mid uplift is 12pp and the user overrides to
+    18pp, the conservative and aggressive scale by 1.5×.)
+    """
     primary_key = sector_keys[0]
 
     sector_econ = dict(assumptions.sectors.get(primary_key, {}))
@@ -531,10 +540,20 @@ def build_roi_table(
             if override_val is not None:
                 sector_econ[arr_name] = override_val
 
-    fees = sector_econ["avg_pursuit_fee_m"]
-    uplifts = sector_econ["win_rate_uplift_pp"]
-    volumes = sector_econ["pilot_volume"]
-    costs = sector_econ["pilot_cost_m"]
+    fees = list(sector_econ["avg_pursuit_fee_m"])
+    uplifts = list(sector_econ["win_rate_uplift_pp"])
+    volumes = list(sector_econ["pilot_volume"])
+    costs = list(sector_econ["pilot_cost_m"])
+
+    # Apply Mid-scenario overrides, scaling Cons / Agg proportionally
+    if pilot_volume_mid_override is not None and volumes[1] > 0:
+        scale = pilot_volume_mid_override / volumes[1]
+        volumes = [int(round(v * scale)) for v in volumes]
+        volumes[1] = int(pilot_volume_mid_override)
+    if win_rate_uplift_mid_pp_override is not None and uplifts[1] > 0:
+        scale = win_rate_uplift_mid_pp_override / uplifts[1]
+        uplifts = [float(u * scale) for u in uplifts]
+        uplifts[1] = float(win_rate_uplift_mid_pp_override)
 
     if not (len(fees) == len(uplifts) == len(volumes) == len(costs) == 3):
         raise ValueError(
@@ -565,9 +584,14 @@ def build_roi_table(
             first_cycle_roi=float(roi),
         ))
 
+    duration_q = (
+        int(pilot_duration_quarters_override)
+        if pilot_duration_quarters_override is not None
+        else int(assumptions.default_pilot_duration_quarters)
+    )
     return RoiTable(
         sector_key_used=primary_key,
-        pilot_duration_quarters=int(assumptions.default_pilot_duration_quarters),
+        pilot_duration_quarters=duration_q,
         scenarios=scenarios,
     )
 
@@ -664,6 +688,9 @@ def assemble_business_case(
     research,
     forced_sector_keys: Optional[list[str]] = None,
     target_year_override: Optional[int] = None,
+    pilot_volume_mid_override: Optional[int] = None,
+    win_rate_uplift_mid_pp_override: Optional[float] = None,
+    pilot_duration_quarters_override: Optional[int] = None,
 ) -> BusinessCaseInputs:
     """
     Resolve target_year (priority: explicit > research > assumptions default),
@@ -738,6 +765,9 @@ def assemble_business_case(
         sector_keys=pick.sector_keys,
         assumptions=assumptions,
         per_firm_override=per_firm_override,
+        pilot_volume_mid_override=pilot_volume_mid_override,
+        win_rate_uplift_mid_pp_override=win_rate_uplift_mid_pp_override,
+        pilot_duration_quarters_override=pilot_duration_quarters_override,
     )
 
     return BusinessCaseInputs(
@@ -750,7 +780,7 @@ def assemble_business_case(
         market_projection=projection,
         roi_table=roi_table,
         active_growth=active_growth,
-        pilot_duration_quarters=int(assumptions.default_pilot_duration_quarters),
+        pilot_duration_quarters=roi_table.pilot_duration_quarters,
         research=research,
     )
 

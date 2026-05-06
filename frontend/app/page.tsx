@@ -91,6 +91,9 @@ export default function Home() {
   // Business Case options
   const [bcSector, setBcSector] = useState<string>(""); // "" = auto-pick
   const [bcTargetYear, setBcTargetYear] = useState<string>(""); // empty = use research file or default
+  const [bcPilotVolume, setBcPilotVolume] = useState<string>("");        // empty = sector default
+  const [bcWinRateUplift, setBcWinRateUplift] = useState<string>("");    // empty = sector default
+  const [bcPilotDuration, setBcPilotDuration] = useState<string>("");    // empty = 6 quarters
 
   const [loading, setLoading] = useState(false);
   const [activeJob, setActiveJob] = useState<Job | null>(null);
@@ -148,11 +151,14 @@ export default function Home() {
 
       if (reportType === "business-case") {
         endpoint = "/api/business-case";
-        const targetYearNum = bcTargetYear.trim() ? Number(bcTargetYear) : null;
+        const toNum = (s: string) => (s.trim() ? Number(s) : null);
         payload = {
           firmName,
           sector: bcSector || null,
-          targetYear: targetYearNum,
+          targetYear: toNum(bcTargetYear),
+          pilotVolumeMid: toNum(bcPilotVolume),
+          winRateUpliftMidPp: toNum(bcWinRateUplift),
+          pilotDurationQuarters: toNum(bcPilotDuration),
           noNarrative,
         };
       } else {
@@ -381,6 +387,53 @@ export default function Home() {
                       disabled={loading}
                     />
                   </div>
+                </div>
+
+                <div className="options-grid">
+                  <div>
+                    <label htmlFor="bcPilotVolume">Pilot pursuit volume (Mid)</label>
+                    <input
+                      id="bcPilotVolume"
+                      type="number"
+                      min={1}
+                      max={500}
+                      placeholder="sector default"
+                      value={bcPilotVolume}
+                      onChange={(e) => setBcPilotVolume(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="bcWinRateUplift">Win-rate uplift (pp, Mid)</label>
+                    <input
+                      id="bcWinRateUplift"
+                      type="number"
+                      min={0.5}
+                      max={50}
+                      step={0.5}
+                      placeholder="sector default"
+                      value={bcWinRateUplift}
+                      onChange={(e) => setBcWinRateUplift(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="bcPilotDuration">Pilot duration (quarters)</label>
+                    <input
+                      id="bcPilotDuration"
+                      type="number"
+                      min={1}
+                      max={12}
+                      placeholder="default: 6"
+                      value={bcPilotDuration}
+                      onChange={(e) => setBcPilotDuration(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: "-0.5rem", fontSize: "0.8rem", color: "#888" }}>
+                  Mid-scenario overrides; Conservative and Aggressive scale proportionally.
                 </div>
 
                 <div className="checkbox-row">

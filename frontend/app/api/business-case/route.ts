@@ -16,11 +16,26 @@ export async function POST(req: NextRequest) {
     typeof body.targetYear === "number" && Number.isFinite(body.targetYear)
       ? body.targetYear
       : null;
+  const pilotVolumeMid =
+    typeof body.pilotVolumeMid === "number" && Number.isFinite(body.pilotVolumeMid) && body.pilotVolumeMid > 0
+      ? Math.round(body.pilotVolumeMid)
+      : null;
+  const winRateUpliftMidPp =
+    typeof body.winRateUpliftMidPp === "number" && Number.isFinite(body.winRateUpliftMidPp) && body.winRateUpliftMidPp > 0
+      ? body.winRateUpliftMidPp
+      : null;
+  const pilotDurationQuarters =
+    typeof body.pilotDurationQuarters === "number" && Number.isFinite(body.pilotDurationQuarters) && body.pilotDurationQuarters > 0
+      ? Math.round(body.pilotDurationQuarters)
+      : null;
 
   const payload = {
     firm_name: body.firmName.trim(),
     sector,
     target_year: targetYear,
+    pilot_volume_mid: pilotVolumeMid,
+    win_rate_uplift_mid_pp: winRateUpliftMidPp,
+    pilot_duration_quarters: pilotDurationQuarters,
     no_narrative: body.noNarrative ?? false,
     model: body.model ?? "claude-sonnet-4-6",
   };

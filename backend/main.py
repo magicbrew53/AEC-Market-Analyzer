@@ -64,8 +64,11 @@ class GenerateRequest(BaseModel):
 
 class BusinessCaseRequest(BaseModel):
     firm_name: str
-    sector: Optional[str] = None         # None | "power" | "water_supply,sewer_waste"
-    target_year: Optional[int] = None    # None means "use research file or default"
+    sector: Optional[str] = None              # None | "power" | "water_supply,sewer_waste"
+    target_year: Optional[int] = None         # None = use research file or default 2029
+    pilot_volume_mid: Optional[int] = None    # Override Mid-scenario pursuit volume
+    win_rate_uplift_mid_pp: Optional[float] = None  # Override Mid-scenario uplift in pp
+    pilot_duration_quarters: Optional[int] = None    # Override pilot length in quarters
     no_narrative: bool = False
     model: str = "claude-sonnet-4-6-20250514"
 
@@ -416,6 +419,9 @@ def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
                 research=research,
                 forced_sector_keys=forced_keys,
                 target_year_override=req.target_year,
+                pilot_volume_mid_override=req.pilot_volume_mid,
+                win_rate_uplift_mid_pp_override=req.win_rate_uplift_mid_pp,
+                pilot_duration_quarters_override=req.pilot_duration_quarters,
             )
         except ValueError as e:
             update_job(job_id, status="failed", message=str(e))
