@@ -260,15 +260,20 @@ def rank_sectors(
     start_year: int,
     end_year: int,
     thresholds: dict,
+    always_include: Optional[list[str]] = None,
 ) -> list[SectorCandidate]:
     """
     Compute facts for every named sector, filter to those passing the
     size/share thresholds, sort ASC by (firm_real_cagr - comp_real_cagr).
 
     Skips 'total' and 'intl' (those are not pilotable sectors).
+
+    `always_include` keys (e.g. user-forced sectors) bypass the size/share
+    filter so a deliberate override still works on small firms.
     """
     min_rev = thresholds["min_end_revenue_m"]
     min_share = thresholds["min_end_share"]
+    always_include_set = set(always_include or [])
 
     candidates: list[SectorCandidate] = []
     for sector_key, sector_label in section_order:
@@ -292,9 +297,11 @@ def rank_sectors(
 
         if facts.end_nom_m is None or facts.end_share is None:
             continue
-        if facts.end_nom_m < min_rev or facts.end_share < min_share:
-            continue
         if facts.real_cagr_pct is None or facts.comp_real_cagr_pct is None:
+            continue
+
+        passes_filter = (facts.end_nom_m >= min_rev and facts.end_share >= min_share)
+        if not passes_filter and sector_key not in always_include_set:
             continue
 
         delta_pp = facts.real_cagr_pct - facts.comp_real_cagr_pct
@@ -327,8 +334,10 @@ def pick_sector(
     """
     if not candidates and not forced_keys:
         raise ValueError(
-            "No sectors passed the size/share filter. Try lowering the filter "
-            "thresholds in revwin_pilot_assumptions.json, or override with --sector."
+            "No sectors passed the size/share filter (>= $50M revenue, >= 1% share). "
+            "This usually means the firm is too small for the auto-picker. "
+            "Pick a specific sector via the Sector override dropdown — forced "
+            "sectors bypass the filter."
         )
 
     by_key = {c.sector_key: c for c in candidates}
@@ -336,14 +345,14 @@ def pick_sector(
     if forced_keys:
         forced_keys = [k for k in forced_keys if k]
         if not forced_keys:
-            raise ValueError("--sector specified but contained no valid keys.")
+            raise ValueError("Sector override specified but contained no valid keys.")
 
         primary_key = forced_keys[0]
         if primary_key not in by_key:
             raise ValueError(
-                f"Sector '{primary_key}' is not available for this firm "
-                f"(no data, or didn't pass size/share filter). "
-                f"Available: {sorted(by_key.keys())}"
+                f"Sector '{primary_key}' has no ENR data for this firm — "
+                f"the sector exists in the schema but the firm reported zero "
+                f"or no rows for it. Pick a different sector."
             )
         primary = by_key[primary_key]
 
@@ -718,7 +727,7 @@ def assemble_business_case(
     if target_year <= end_year:
         target_year = end_year + 1
 
-    # 2. Rank candidates
+    # 2. Rank candidates (forced sectors bypass the size/share filter)
     candidates = rank_sectors(
         firm_data=firm_data,
         composite_by_year=composite_by_year,
@@ -729,6 +738,7 @@ def assemble_business_case(
         start_year=start_year,
         end_year=end_year,
         thresholds=assumptions.filter_thresholds,
+        always_include=forced_sector_keys,
     )
 
     # 3. Pick sector
