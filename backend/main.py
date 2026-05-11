@@ -62,6 +62,11 @@ class GenerateRequest(BaseModel):
     model: str = "claude-sonnet-4-6-20250514"
 
 
+class MADiscoveryRequest(BaseModel):
+    firm_name: str
+    refresh: bool = False
+
+
 class BusinessCaseRequest(BaseModel):
     firm_name: str
     sector: Optional[str] = None              # None | "power" | "water_supply,sewer_waste"
@@ -517,6 +522,94 @@ def upload_to_blob(file_path: Path, filename: str) -> str:
         )
     resp.raise_for_status()
     return resp.json()["url"]
+
+
+@app.post("/discover-ma")
+def discover_ma(req: MADiscoveryRequest, x_api_secret: Optional[str] = Header(None)):
+    """
+    Run M&A discovery for a firm. Calls Claude Haiku + web_search to find
+    acquisitions, verifies each against the ENR panel, and writes the result
+    to data/ma_cache/{FIRM}.json. Returns the verified list.
+
+    If a cached result exists and `refresh` is false, returns the cache
+    without re-calling the LLM.
+    """
+    require_auth(x_api_secret)
+
+    import sys
+    from dataclasses import asdict as _asdict
+    sys.path.insert(0, str(Path(__file__).parent))
+    sys.path.insert(0, str(Path(__file__).parent / "lib"))
+
+    try:
+        from lib.ingest import build_panel
+        from lib.resolve import resolve as resolve_fn
+        from lib.ma_discovery import (
+            discover_acquisitions,
+            verify_acquisitions,
+            load_ma_cache,
+            save_ma_cache,
+            MARollupConfig,
+        )
+
+        ma_cache_dir = DATA_DIR / "ma_cache"
+        panel = build_panel(DATA_DIR / "enr")
+
+        try:
+            match = resolve_fn(
+                panel,
+                req.firm_name,
+                user_cache_path=DATA_DIR / "user_aliases.json",
+                interactive=False,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=f"Firm not found: {e}")
+
+        firm_short = match.firm_keys[0] if match.firm_keys else req.firm_name.upper()
+
+        if not req.refresh:
+            cached = load_ma_cache(firm_short, ma_cache_dir)
+            if cached is not None:
+                return {
+                    "firm_short": firm_short,
+                    "cached": True,
+                    "cached_at": cached.cached_at.isoformat(),
+                    "acquisitions": [_asdict(a) for a in cached.acquisitions],
+                }
+
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise HTTPException(
+                status_code=500,
+                detail="ANTHROPIC_API_KEY not set on backend; M&A discovery requires Haiku + web_search.",
+            )
+
+        candidates = discover_acquisitions(firm_short, panel)
+        verified = verify_acquisitions(
+            candidates,
+            panel,
+            user_cache_path=DATA_DIR / "user_aliases.json",
+        )
+
+        from datetime import datetime as _dt, timezone as _tz
+        config = MARollupConfig(
+            parent_firm_short=firm_short,
+            acquisitions=verified,
+            cached_at=_dt.now(_tz.utc),
+        )
+        save_ma_cache(config, ma_cache_dir)
+
+        return {
+            "firm_short": firm_short,
+            "cached": False,
+            "cached_at": config.cached_at.isoformat(),
+            "candidates_proposed": len(candidates),
+            "acquisitions": [_asdict(a) for a in verified],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("M&A discovery failed")
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/health")
