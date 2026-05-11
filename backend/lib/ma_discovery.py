@@ -3,9 +3,14 @@ ma_discovery.py — discover and verify M&A history for a parent firm.
 
 A two-stage pipeline:
 
-  1. discover_acquisitions(...) — calls Claude Haiku with the web_search tool
-     to list acquisitions where the acquired firm appeared on ENR Top 500.
-     Returns AcquisitionCandidate rows with source URLs.
+  1. discover_acquisitions(...) — calls Claude Sonnet with the web_search
+     tool to list acquisitions where the acquired firm appeared on ENR
+     Top 500. Returns AcquisitionCandidate rows with source URLs.
+
+     (Originally Haiku; switched to Sonnet because Haiku consistently
+     stopped at 1-3 obvious hits even with strong prompt + research
+     strategy. Sonnet's multi-step reasoning produces a much more
+     complete list. Cost is ~$0.10-0.15 per fresh run.)
 
   2. verify_acquisitions(...) — runs each candidate through the existing
      firm resolver (lib/resolve.py) and confirms the acquired firm has ENR
@@ -158,7 +163,7 @@ def discover_acquisitions(
     panel: pd.DataFrame,
     *,
     api_key: Optional[str] = None,
-    model: str = "claude-haiku-4-5",
+    model: str = "claude-sonnet-4-6",
     min_year: int = 2005,
     max_year: Optional[int] = None,
     max_tokens: int = 8000,

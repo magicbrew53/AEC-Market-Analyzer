@@ -81,14 +81,14 @@ export default function MADiscoveryTest() {
                   onChange={(e) => setRefresh(e.target.checked)}
                   disabled={loading}
                 />
-                Force refresh (ignore cache, re-call Haiku — costs ~$0.02)
+                Force refresh (ignore cache, re-call Sonnet — costs ~$0.10–0.15)
               </label>
             </div>
             <button className="primary" type="submit" disabled={loading || !firmName.trim()}>
               {loading ? "Discovering… (web search can take ~30s)" : "Discover M&A history"}
             </button>
             <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#666" }}>
-              Calls Claude Haiku with web search, verifies each acquisition against the ENR panel, writes the result to data/ma_cache/{"{FIRM}"}.json on the backend.
+              Calls Claude Sonnet with web search, verifies each acquisition against the ENR panel, writes the result to data/ma_cache/{"{FIRM}"}.json on the backend.
             </div>
           </form>
         </div>
