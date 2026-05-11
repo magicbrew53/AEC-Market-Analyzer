@@ -102,8 +102,10 @@ RESEARCH STRATEGY — be thorough:
   4. For each acquisition you find, do a second search to verify the year and check whether the acquired firm was on ENR Top 500 Design Firms.
   5. Don't stop at the first 2-3 hits — known AEC consolidators routinely have 8-15 ENR-listed acquisitions over a 20-year span.
 
-OUTPUT FORMAT — STRICT:
-Return ONLY a JSON array. No prose, no markdown fences, no explanation. Every entry has exactly these keys:
+OUTPUT FORMAT — STRICT, NON-NEGOTIABLE:
+After you finish all research and verification, your FINAL message must contain ONLY the JSON array — nothing else. No introduction ("Here are the acquisitions"), no headers, no markdown fences, no closing commentary. The first character of your final message must be `[` and the last character must be `]`. If you write any prose in the final message you have failed the task.
+
+Each entry has exactly these keys:
 
   "acquired_firm":     <official name as commonly reported>,
   "acquisition_year":  <int>,
@@ -123,9 +125,21 @@ def _build_discovery_prompt(firm_short: str, min_year: int, max_year: int) -> st
 
 
 def _extract_json_array(text: str) -> list[dict]:
-    """Pull a JSON array out of the model response. Tolerant of code fences or trailing prose."""
+    """Pull a JSON array out of the model response.
+
+    Tolerant of:
+      - Direct JSON output
+      - JSON inside ```json fences
+      - JSON embedded in narration / interleaved research prose (Sonnet
+        often emits multi-step thinking text before the final JSON)
+
+    Strategy: try fast paths first (direct parse, code fence), then scan
+    the whole text for every `[...]` substring and return the LARGEST one
+    that parses as a JSON list of objects.
+    """
     text = text.strip()
-    # Direct parse
+
+    # 1. Direct parse
     try:
         v = json.loads(text)
         if isinstance(v, list):
@@ -133,7 +147,7 @@ def _extract_json_array(text: str) -> list[dict]:
     except json.JSONDecodeError:
         pass
 
-    # Strip markdown code fences if present
+    # 2. Strip markdown code fences if present
     fence_match = re.search(r"```(?:json)?\s*(\[[\s\S]*?\])\s*```", text)
     if fence_match:
         try:
@@ -143,18 +157,38 @@ def _extract_json_array(text: str) -> list[dict]:
         except json.JSONDecodeError:
             pass
 
-    # Find a top-level bracketed array
-    bracket_match = re.search(r"\[\s*(?:\{[\s\S]*?\}\s*,?\s*)*\]", text)
-    if bracket_match:
-        try:
-            v = json.loads(bracket_match.group(0))
-            if isinstance(v, list):
-                return v
-        except json.JSONDecodeError:
-            pass
+    # 3. Bracket-balanced scan: find every top-level [...] block, try each.
+    candidates: list[list] = []
+    depth = 0
+    start = -1
+    for i, ch in enumerate(text):
+        if ch == "[":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "]" and depth > 0:
+            depth -= 1
+            if depth == 0 and start >= 0:
+                blob = text[start:i + 1]
+                try:
+                    v = json.loads(blob)
+                    if isinstance(v, list):
+                        candidates.append(v)
+                except json.JSONDecodeError:
+                    pass
+                start = -1
+
+    if candidates:
+        # Prefer the array with the most items, then the longest serialized form
+        # — that's almost always the final result, not an intermediate example.
+        candidates.sort(
+            key=lambda arr: (len(arr), sum(1 for x in arr if isinstance(x, dict))),
+            reverse=True,
+        )
+        return candidates[0]
 
     raise ValueError(
-        f"Could not parse JSON array from model response. First 500 chars:\n{text[:500]}"
+        f"Could not parse JSON array from model response. First 800 chars:\n{text[:800]}"
     )
 
 
