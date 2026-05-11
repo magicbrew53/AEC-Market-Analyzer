@@ -95,12 +95,14 @@ EXCLUDE:
   - Small tuck-in acquisitions of practices that were never independently ranked
   - Acquisitions older than {min_year} or later than {max_year}
 
-RESEARCH STRATEGY — be thorough:
-  1. Search "{firm_short} acquisitions" and "{firm_short} list of mergers and acquisitions".
-  2. Check Wikipedia for {firm_short} and look at the article's "Acquisitions" or "History" section.
-  3. Search for "{firm_short} acquires" press-release archives.
-  4. For each acquisition you find, do a second search to verify the year and check whether the acquired firm was on ENR Top 500 Design Firms.
-  5. Don't stop at the first 2-3 hits — known AEC consolidators routinely have 8-15 ENR-listed acquisitions over a 20-year span.
+RESEARCH STRATEGY — be thorough but SILENT:
+  1. Run all web_search calls SILENTLY. Do not emit any commentary, narration, or status updates between or after searches. No "I'll search...", no "Now let me check...", no "Good start...". Each search call is the only output between user input and the final JSON.
+  2. Search "{firm_short} acquisitions" and "{firm_short} list of mergers and acquisitions".
+  3. Check Wikipedia for {firm_short} and look at the article's "Acquisitions" or "History" section.
+  4. Search for "{firm_short} acquires" press-release archives.
+  5. For each acquisition you find, do a second search to verify the year and check whether the acquired firm was on ENR Top 500 Design Firms.
+  6. Don't stop at the first 2-3 hits — known AEC consolidators routinely have 8-15 ENR-listed acquisitions over a 20-year span.
+  7. Once you have a comprehensive list, emit ONLY the JSON array as your final message and stop.
 
 OUTPUT FORMAT — STRICT, NON-NEGOTIABLE:
 After you finish all research and verification, your FINAL message must contain ONLY the JSON array — nothing else. No introduction ("Here are the acquisitions"), no headers, no markdown fences, no closing commentary. The first character of your final message must be `[` and the last character must be `]`. If you write any prose in the final message you have failed the task.
@@ -200,7 +202,7 @@ def discover_acquisitions(
     model: str = "claude-sonnet-4-6",
     min_year: int = 2005,
     max_year: Optional[int] = None,
-    max_tokens: int = 8000,
+    max_tokens: int = 24000,
 ) -> list[AcquisitionCandidate]:
     """
     Call Claude Haiku with the web_search tool to list acquisitions for
