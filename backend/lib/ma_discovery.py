@@ -75,22 +75,37 @@ class MARollupConfig:
 
 _DISCOVERY_PROMPT = """You are researching publicly-known acquisitions made by the AEC firm "{firm_short}".
 
-List every acquisition {firm_short} has made between {min_year} and {max_year} where the acquired firm appeared on the ENR Top 500 Design Firms list at any point before being acquired.
+List EVERY material acquisition {firm_short} completed between {min_year} and {max_year} where the acquired firm was a design, engineering, architecture, or environmental-consulting firm that appeared on an ENR Top 500 Design Firms ranking at any point before being acquired.
 
-CRITICAL CONSTRAINTS:
-  - Only include acquisitions where the acquired firm appeared on the ENR Top 500 Design Firms list.
-  - Do NOT include small tuck-in acquisitions that never appeared on ENR Top 500.
-  - Cite a source URL for each acquisition — Wikipedia, the firm's press release, ENR coverage, or M&A news outlets.
-  - If you cannot find a source URL for an acquisition, OMIT it entirely.
-  - Do not invent or estimate years. If the year is uncertain, mark "low" confidence and include the best public estimate.
-  - Use the search tool aggressively. Search for "{firm_short} acquisitions", then for specific acquired-firm names you find.
+INCLUDE:
+  - Design firms (architecture, engineering, A/E firms)
+  - Specialty engineering firms (transportation, water, environmental, power)
+  - Environmental consulting firms
+  - Cost-consulting / program-management firms with design practices
+  - Firms that historically appeared on the ENR Top 500 Design Firms list
 
-Output ONLY a JSON array, no prose, no markdown fences, no explanation. Each entry has exactly these keys:
+EXCLUDE:
+  - Pure construction firms / general contractors (they're on the ENR Top 400 Contractors list, not Top 500 Design Firms)
+  - Construction-management-only firms with no design practice
+  - Small tuck-in acquisitions of practices that were never independently ranked
+  - Acquisitions older than {min_year} or later than {max_year}
+
+RESEARCH STRATEGY — be thorough:
+  1. Search "{firm_short} acquisitions" and "{firm_short} list of mergers and acquisitions".
+  2. Check Wikipedia for {firm_short} and look at the article's "Acquisitions" or "History" section.
+  3. Search for "{firm_short} acquires" press-release archives.
+  4. For each acquisition you find, do a second search to verify the year and check whether the acquired firm was on ENR Top 500 Design Firms.
+  5. Don't stop at the first 2-3 hits — known AEC consolidators routinely have 8-15 ENR-listed acquisitions over a 20-year span.
+
+OUTPUT FORMAT — STRICT:
+Return ONLY a JSON array. No prose, no markdown fences, no explanation. Every entry has exactly these keys:
 
   "acquired_firm":     <official name as commonly reported>,
   "acquisition_year":  <int>,
-  "source_url":        <url citing the acquisition>,
+  "source_url":        <url that cites this acquisition>,
   "confidence":        "high" | "medium" | "low"
+
+Cite a real source URL for each — Wikipedia, the firm's press release, ENR coverage, or M&A news outlets. If you cannot find a source URL, OMIT that acquisition entirely. Do not invent years. If the year is uncertain, mark "low" confidence and provide your best public estimate.
 
 If you find no qualifying acquisitions, return an empty array: []
 """
@@ -146,7 +161,7 @@ def discover_acquisitions(
     model: str = "claude-haiku-4-5",
     min_year: int = 2005,
     max_year: Optional[int] = None,
-    max_tokens: int = 4000,
+    max_tokens: int = 8000,
 ) -> list[AcquisitionCandidate]:
     """
     Call Claude Haiku with the web_search tool to list acquisitions for
