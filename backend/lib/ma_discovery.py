@@ -228,17 +228,23 @@ def discover_acquisitions(
     prompt = _build_discovery_prompt(firm_short, min_year, max_year)
 
     client = anthropic.Anthropic(api_key=api_key)
-    response = client.messages.create(
+
+    # Streaming is required for any call that may run >10 minutes — the
+    # combination of web_search round-trips + max_tokens=24000 can exceed
+    # that, so we always stream. We don't need the intermediate events,
+    # only the final message.
+    with client.messages.stream(
         model=model,
         max_tokens=max_tokens,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
-    )
+    ) as stream:
+        final_message = stream.get_final_message()
 
     # The model may emit multiple content blocks (server-tool results,
     # interleaved with text). Concatenate the text blocks for parsing.
     text_parts: list[str] = []
-    for block in response.content:
+    for block in final_message.content:
         if hasattr(block, "text") and block.text:
             text_parts.append(block.text)
     raw_text = "\n".join(text_parts).strip()
