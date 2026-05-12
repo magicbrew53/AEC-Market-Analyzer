@@ -104,20 +104,56 @@ RESEARCH STRATEGY — be thorough:
   6. Don't stop at the first 2-3 hits — large AEC firms routinely have 5-15 design-firm acquisitions over a 20-year span. Keep searching until you've exhausted the Wikipedia/press-release sources.
   7. You may narrate your research process between searches if helpful — the parser is tolerant of interleaved prose. But your FINAL message must contain ONLY the JSON array, no other text.
 
-OUTPUT FORMAT — STRICT, NON-NEGOTIABLE:
-After you finish all research and verification, your FINAL message must contain ONLY the JSON array — nothing else. No introduction ("Here are the acquisitions"), no headers, no markdown fences, no closing commentary. The first character of your final message must be `[` and the last character must be `]`. If you write any prose in the final message you have failed the task.
-
-Each entry has exactly these keys:
-
-  "acquired_firm":     <official name as commonly reported>,
-  "acquisition_year":  <int>,
-  "source_url":        <url that cites this acquisition>,
-  "confidence":        "high" | "medium" | "low"
+OUTPUT — REQUIRED:
+When your research is complete, call the `submit_acquisitions` tool with the full list. Do NOT emit your findings as text — they must come through the tool call. The tool schema enforces the field shape (acquired_firm, acquisition_year, source_url, confidence).
 
 Cite a real source URL for each — Wikipedia, the firm's press release, ENR coverage, or M&A news outlets. If you cannot find a source URL, OMIT that acquisition entirely. Do not invent years. If the year is uncertain, mark "low" confidence and provide your best public estimate.
 
-If you find no qualifying acquisitions, return an empty array: []
+If you find no qualifying acquisitions, call `submit_acquisitions` with an empty acquisitions list.
 """
+
+
+_SUBMIT_TOOL = {
+    "name": "submit_acquisitions",
+    "description": (
+        "Submit the final list of acquisitions you have researched and verified. "
+        "Call this tool exactly once, AFTER you have completed all your web searches. "
+        "Every acquisition must include a real source_url citing the deal."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "acquisitions": {
+                "type": "array",
+                "description": "List of acquisitions made by the firm being researched.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "acquired_firm": {
+                            "type": "string",
+                            "description": "Official name of the acquired firm.",
+                        },
+                        "acquisition_year": {
+                            "type": "integer",
+                            "description": "Year the acquisition closed.",
+                        },
+                        "source_url": {
+                            "type": "string",
+                            "description": "URL citing this acquisition (Wikipedia, press release, ENR, or M&A news).",
+                        },
+                        "confidence": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                            "description": "Your confidence in the year and the design-firm classification.",
+                        },
+                    },
+                    "required": ["acquired_firm", "acquisition_year", "source_url", "confidence"],
+                },
+            },
+        },
+        "required": ["acquisitions"],
+    },
+}
 
 
 def _build_discovery_prompt(firm_short: str, min_year: int, max_year: int) -> str:
@@ -229,30 +265,44 @@ def discover_acquisitions(
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    # Streaming is required for any call that may run >10 minutes — the
-    # combination of web_search round-trips + max_tokens=24000 can exceed
-    # that, so we always stream. We don't need the intermediate events,
-    # only the final message.
+    # Streaming is required for any call that may run >10 minutes; web_search
+    # round-trips + a large max_tokens can easily exceed that.
+    #
+    # We give the model TWO tools: web_search (server-side, Anthropic-managed)
+    # and submit_acquisitions (client-side, enforces a strict JSON schema).
+    # The model researches via web_search, then submits via the structured
+    # tool — no JSON-parsing fragility on our end.
     with client.messages.stream(
         model=model,
         max_tokens=max_tokens,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        tools=[
+            {"type": "web_search_20250305", "name": "web_search"},
+            _SUBMIT_TOOL,
+        ],
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         final_message = stream.get_final_message()
 
-    # The model may emit multiple content blocks (server-tool results,
-    # interleaved with text). Concatenate the text blocks for parsing.
-    text_parts: list[str] = []
+    # Prefer the structured tool call. Fall back to text-blob JSON parsing
+    # if the model bypassed the tool (shouldn't happen but harmless to keep).
+    items: list[dict] = []
     for block in final_message.content:
-        if hasattr(block, "text") and block.text:
-            text_parts.append(block.text)
-    raw_text = "\n".join(text_parts).strip()
+        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", "") == "submit_acquisitions":
+            tool_input = getattr(block, "input", {}) or {}
+            items = list(tool_input.get("acquisitions") or [])
+            break
 
-    if not raw_text:
-        return []
-
-    items = _extract_json_array(raw_text)
+    if not items:
+        text_parts: list[str] = []
+        for block in final_message.content:
+            if hasattr(block, "text") and block.text:
+                text_parts.append(block.text)
+        raw_text = "\n".join(text_parts).strip()
+        if raw_text:
+            try:
+                items = _extract_json_array(raw_text)
+            except ValueError:
+                items = []
 
     out: list[AcquisitionCandidate] = []
     for item in items:
