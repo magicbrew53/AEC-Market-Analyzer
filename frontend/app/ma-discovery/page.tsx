@@ -13,11 +13,19 @@ interface Acquisition {
   enabled: boolean;
 }
 
+interface RejectedCandidate {
+  acquired_firm: string;
+  acquisition_year: number;
+  source_url: string;
+  confidence: string;
+}
+
 interface DiscoveryResponse {
   firm_short: string;
   cached: boolean;
   cached_at: string;
   candidates_proposed?: number;
+  rejected_candidates?: RejectedCandidate[];
   acquisitions: Acquisition[];
 }
 
@@ -109,9 +117,9 @@ export default function MADiscoveryTest() {
               <div>
                 <strong>{result.firm_short}</strong>
                 <div className="history-meta" style={{ marginTop: 2 }}>
-                  {result.cached ? "From cache" : "Fresh from Haiku"}
+                  {result.cached ? "From cache" : "Fresh from Sonnet + web search"}
                   {result.candidates_proposed != null && (
-                    <> · Haiku proposed {result.candidates_proposed}; verified {result.acquisitions.length}</>
+                    <> · Sonnet proposed {result.candidates_proposed}; verified {result.acquisitions.length}</>
                   )}
                   {" · "}cached_at {new Date(result.cached_at).toLocaleString()}
                 </div>
@@ -123,7 +131,8 @@ export default function MADiscoveryTest() {
               <div style={{ padding: "1rem", color: "#888", fontStyle: "italic" }}>
                 No qualifying ENR-listed acquisitions found for {result.firm_short}.
               </div>
-            ) : (
+            ) : null}
+            {result.acquisitions.length > 0 && (
               <table style={{ width: "100%", marginTop: "0.5rem", borderCollapse: "collapse", fontSize: "0.9rem" }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #ddd", textAlign: "left" }}>
@@ -169,6 +178,41 @@ export default function MADiscoveryTest() {
                     ))}
                 </tbody>
               </table>
+            )}
+
+            {result.rejected_candidates && result.rejected_candidates.length > 0 && (
+              <details style={{ marginTop: "1rem" }}>
+                <summary style={{ cursor: "pointer", color: "#888", fontSize: "0.85rem" }}>
+                  Debug: {result.rejected_candidates.length} candidate{result.rejected_candidates.length === 1 ? "" : "s"} rejected by verifier (not in ENR panel, or no pre-merger years)
+                </summary>
+                <table style={{ width: "100%", marginTop: "0.5rem", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #ddd", textAlign: "left", color: "#888" }}>
+                      <th style={{ padding: "0.25rem 0.5rem" }}>Year</th>
+                      <th style={{ padding: "0.25rem 0.5rem" }}>Sonnet proposed</th>
+                      <th style={{ padding: "0.25rem 0.5rem" }}>Conf</th>
+                      <th style={{ padding: "0.25rem 0.5rem" }}>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.rejected_candidates
+                      .slice()
+                      .sort((a, b) => a.acquisition_year - b.acquisition_year)
+                      .map((c, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid #f0f0f0", color: "#888" }}>
+                          <td style={{ padding: "0.25rem 0.5rem" }}>{c.acquisition_year}</td>
+                          <td style={{ padding: "0.25rem 0.5rem" }}>{c.acquired_firm}</td>
+                          <td style={{ padding: "0.25rem 0.5rem" }}>{c.confidence}</td>
+                          <td style={{ padding: "0.25rem 0.5rem" }}>
+                            <a href={c.source_url} target="_blank" rel="noopener noreferrer" style={{ color: "#888" }}>
+                              link
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </details>
             )}
           </div>
         )}

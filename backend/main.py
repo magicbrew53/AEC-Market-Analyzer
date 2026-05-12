@@ -598,11 +598,31 @@ def discover_ma(req: MADiscoveryRequest, x_api_secret: Optional[str] = Header(No
         )
         save_ma_cache(config, ma_cache_dir)
 
+        # Debug: which raw candidates didn't survive verification? Helpful
+        # for diagnosing whether the bottleneck is the LLM (few candidates)
+        # or the verifier (candidates exist but don't resolve in the panel).
+        verified_names_lower = {a.acquired_firm_display.lower() for a in verified}
+        rejected_candidates = [
+            {
+                "acquired_firm": c.acquired_firm,
+                "acquisition_year": c.acquisition_year,
+                "source_url": c.source_url,
+                "confidence": c.confidence,
+            }
+            for c in candidates
+            if c.acquired_firm.lower() not in verified_names_lower
+            and not any(
+                v in c.acquired_firm.lower() or c.acquired_firm.lower() in v
+                for v in verified_names_lower
+            )
+        ]
+
         return {
             "firm_short": firm_short,
             "cached": False,
             "cached_at": config.cached_at.isoformat(),
             "candidates_proposed": len(candidates),
+            "rejected_candidates": rejected_candidates,
             "acquisitions": [_asdict(a) for a in verified],
         }
     except HTTPException:
