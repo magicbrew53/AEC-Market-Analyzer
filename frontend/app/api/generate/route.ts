@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     no_narrative: body.noNarrative ?? false,
     no_forecast: body.noForecast ?? false,
     model: body.model ?? "claude-sonnet-4-6",
+    enr_list: body.enrList ?? "auto",
   };
 
   const resp = await fetch(`${BACKEND_URL}/generate`, {

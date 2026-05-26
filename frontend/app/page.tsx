@@ -87,6 +87,7 @@ export default function Home() {
   const [baseYear, setBaseYear] = useState(2025);
   const [noNarrative, setNoNarrative] = useState(false);
   const [noForecast, setNoForecast] = useState(false);
+  const [enrList, setEnrList] = useState<"auto" | "enr500" | "enr400">("auto");
 
   // Business Case options
   const [bcSector, setBcSector] = useState<string>(""); // "" = auto-pick
@@ -165,6 +166,7 @@ export default function Home() {
         endpoint = "/api/generate";
         payload = {
           firmName, spanStart, spanEnd, baseYear, noNarrative, noForecast,
+          enrList,
         };
       }
 
@@ -243,7 +245,7 @@ export default function Home() {
     <>
       <header>
         <h1>RevWin Market Analysis</h1>
-        <span>ENR Top 500 · AEC Firm Reports</span>
+        <span>ENR Top 500 Design Firms · ENR Top 400 Contractors · AEC Firm Reports</span>
       </header>
 
       <main>
@@ -333,6 +335,21 @@ export default function Home() {
                       disabled={loading}
                     />
                   </div>
+                </div>
+
+                <div style={{ marginTop: "0.75rem" }}>
+                  <label htmlFor="enrList">ENR Benchmark List</label>
+                  <select
+                    id="enrList"
+                    value={enrList}
+                    onChange={(e) => setEnrList(e.target.value as typeof enrList)}
+                    disabled={loading}
+                    style={{ marginTop: "0.25rem" }}
+                  >
+                    <option value="auto">Auto-detect (design firm → ENR 500, contractor → ENR 400)</option>
+                    <option value="enr500">ENR Top 500 Design Firms</option>
+                    <option value="enr400">ENR Top 400 Contractors</option>
+                  </select>
                 </div>
 
                 <div className="checkbox-row">
