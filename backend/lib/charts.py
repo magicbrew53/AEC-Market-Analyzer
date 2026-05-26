@@ -119,6 +119,15 @@ def _pct_axis(x, pos):
     return f"{x*100:.0f}%"
 
 
+def _no_data_chart(out_path, label: str = "No data available for this sector") -> None:
+    fig, ax = plt.subplots(figsize=DEFAULT_FIG_SIZE, dpi=120)
+    ax.text(0.5, 0.5, label, ha="center", va="center",
+            transform=ax.transAxes, color="#888888", fontsize=11)
+    ax.axis("off")
+    fig.savefig(out_path, bbox_inches="tight", facecolor="white", dpi=120)
+    plt.close(fig)
+
+
 def _firm_col_for_sector(sector_key: str) -> str:
     if sector_key == "total" or sector_key is None:
         return "total_rev_m"
@@ -141,6 +150,10 @@ def _revenue_dual_axis(firm_data, composite_data, firm_short, sector_label, sect
         composite_data[["data_year", "value"]].rename(columns={"value": "comp"}),
         on="data_year", how="outer",
     ).sort_values("data_year").reset_index(drop=True)
+
+    if merged.empty or merged["data_year"].isna().all():
+        _no_data_chart(out_path)
+        return
 
     if deflate and cci_lookup:
         merged["firm"] = [
@@ -270,6 +283,10 @@ def _yoy_paired_bars(firm_data, composite_data, firm_short, sector_label, sector
     merged["comp_yoy"] = merged["comp"].pct_change()
     merged = merged.dropna(subset=["firm_yoy", "comp_yoy"], how="all").reset_index(drop=True)
 
+    if merged.empty or merged["data_year"].isna().all():
+        _no_data_chart(out_path)
+        return
+
     year_min = int(merged["data_year"].min()) - 1
     year_max = int(merged["data_year"].max())
     if forecast_year and forecast_year > year_max:
@@ -330,6 +347,10 @@ def chart_market_share(firm_data, composite_data, firm_short, sector_label, sect
         composite_data[["data_year", "value"]].rename(columns={"value": "comp"}),
         on="data_year", how="outer",
     ).sort_values("data_year").reset_index(drop=True)
+
+    if merged.empty or merged["data_year"].isna().all():
+        _no_data_chart(out_path)
+        return
 
     merged["share"] = merged["firm"] / merged["comp"]
 
