@@ -63,7 +63,10 @@ SECTOR_HEADER_PATTERNS = {
     "gen_bldg": ["general_building", "general building", "gen bldg", "gen_bldg"],
     "manufacturing": ["manufacturing", "mfg"],
     "power": ["power"],
-    "water_supply": ["water_supply", "water supply"],
+    # ENR 400 combines water+sewer as "WTR./SWR. WASTE"; "wtr" catches that header
+    # and maps it to water_supply. sewer_waste stays null for ENR 400 records, which
+    # is correct — the two categories are not separately reported in that list.
+    "water_supply": ["water_supply", "water supply", "wtr"],
     "sewer_waste": ["sewer_waste", "sewer/waste", "sewer waste"],
     "ind_pet": [
         "industrial/oil&gas",
@@ -468,6 +471,38 @@ def build_panel(enr_dir: Path) -> pd.DataFrame:
     df = pd.DataFrame.from_records(all_records)
 
     # Stable sort: edition_year ascending, rank ascending (with NaN ranks last)
+    df = df.sort_values(["edition_year", "rank"], na_position="last").reset_index(drop=True)
+    return df
+
+
+def build_contractors_panel(enr_dir: Path) -> pd.DataFrame:
+    """
+    Read all ENR 400 Contractor files and return a single normalized DataFrame.
+
+    Looks for files in `enr_dir/ENR 400 Construct/`. Returns an empty DataFrame
+    if the subfolder doesn't exist (so callers can handle gracefully).
+
+    Schema is identical to build_panel() output. Note: ENR 400 reports
+    water+sewer as a single "WTR./SWR. WASTE" column — it is mapped to
+    water_supply; sewer_waste will be null for all contractor records.
+    """
+    construct_subdir = Path(enr_dir) / "ENR 400 Construct"
+    if not construct_subdir.is_dir():
+        return pd.DataFrame()
+
+    files = sorted(construct_subdir.glob("*.xlsx"))
+    if not files:
+        return pd.DataFrame()
+
+    all_records: list[dict] = []
+    for f in files:
+        records = _read_file(f)
+        all_records.extend(records)
+
+    if not all_records:
+        return pd.DataFrame()
+
+    df = pd.DataFrame.from_records(all_records)
     df = df.sort_values(["edition_year", "rank"], na_position="last").reset_index(drop=True)
     return df
 

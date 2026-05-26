@@ -60,6 +60,7 @@ class GenerateRequest(BaseModel):
     no_narrative: bool = False
     no_forecast: bool = False
     model: str = "claude-sonnet-4-6-20250514"
+    enr_list: str = "auto"  # "auto" | "enr500" | "enr400"
 
 
 class MADiscoveryRequest(BaseModel):
@@ -115,8 +116,8 @@ def run_pipeline(job_id: str, req: GenerateRequest):
         update_job(job_id, status="running", message="Loading ENR data...", progress=5)
 
         import pandas as pd
-        from lib.ingest import build_panel, load_cci_annual
-        from lib.resolve import resolve as resolve_fn, get_firm_panel
+        from lib.ingest import build_panel, build_contractors_panel, load_cci_annual
+        from lib.resolve import resolve_auto, get_firm_panel
         from lib.charts import build_composite_by_year, render_sector_charts
         from lib.compute import compute_section_facts
         from lib.research import load_research
@@ -130,24 +131,31 @@ def run_pipeline(job_id: str, req: GenerateRequest):
         base_year = req.base_year
 
         # --- Load data ---
-        panel = build_panel(DATA_DIR / "enr")
-        update_job(job_id, progress=12, message="Loading CCI and computing composite...")
+        update_job(job_id, progress=8, message="Loading ENR panels...")
+        design_panel = build_panel(DATA_DIR / "enr")
+        contractors_panel = build_contractors_panel(DATA_DIR / "enr")
+        update_job(job_id, progress=12, message="Loading CCI...")
 
         cci = load_cci_annual(DATA_DIR / "cci.xlsx", base_year=base_year)
         cci_lookup = dict(zip(cci["year"], cci["deflator"]))
-        composite_by_year = build_composite_by_year(panel)
 
-        # --- Resolve firm ---
+        # --- Resolve firm (auto-routes to correct ENR list) ---
         update_job(job_id, progress=18, message=f"Resolving firm '{req.firm_name}'...")
+        force_list = req.enr_list if req.enr_list != "auto" else None
         try:
-            match = resolve_fn(
-                panel, req.firm_name,
+            panel, match, enr_list_name = resolve_auto(
+                design_panel, contractors_panel, req.firm_name,
                 user_cache_path=DATA_DIR / "user_aliases.json",
                 interactive=False,
+                force_list=force_list,
             )
         except ValueError:
             update_job(job_id, status="failed", message=f"Firm '{req.firm_name}' not found in ENR data.")
             return
+
+        enr_label = "ENR Top 500 Design Firms" if enr_list_name == "enr500" else "ENR Top 400 Contractors"
+        update_job(job_id, progress=22, message=f"Computing {enr_label} composite...")
+        composite_by_year = build_composite_by_year(panel)
 
         firm_data = get_firm_panel(panel, match)
         if firm_data.empty:
@@ -292,12 +300,14 @@ def run_pipeline(job_id: str, req: GenerateRequest):
                 "acquisitions": research.acquisitions,
             }
 
+        n_firms = 400 if enr_list_name == "enr400" else 500
         methodology = (
             f"This report blends {firm_short} firm-level revenue data from "
-            f"{actual_end - actual_start + 1} consecutive ENR Top 500 Design Firms editions "
+            f"{actual_end - actual_start + 1} consecutive {enr_label} editions "
             f"({actual_start}–{actual_end}) with sector-level composite benchmarks. Analysis is "
             f"presented in both nominal dollars and constant {base_year} dollars using the ENR "
-            f"20-City Construction Cost Index. "
+            f"20-City Construction Cost Index. The ENR Composite is computed as "
+            f"Σ(firm revenue × firm sector %) across all {n_firms} firms per year. "
             + (f"Forecast values for {forecast_year} apply FMI quarterly growth rates per sector."
                if forecast_year else "")
         )
@@ -308,7 +318,7 @@ def run_pipeline(job_id: str, req: GenerateRequest):
             primary_color_hex=primary_color,
             publish_date=date.today().strftime("%B %d, %Y"),
             sources=[
-                f"ENR Top 500 Design Firms surveys ({actual_start}–{actual_end + 1} editions)",
+                f"{enr_label} surveys ({actual_start}–{actual_end + 1} editions)",
                 f"ENR 20-City CCI (inflation adjustment, {base_year} base)",
                 *(["FMI Q1 forecast (sector growth rates)"] if fmi else []),
             ],
@@ -359,8 +369,8 @@ def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
         update_job(job_id, status="running",
                    message="Picking sector and computing ROI...", progress=10)
 
-        from lib.ingest import build_panel, load_cci_annual
-        from lib.resolve import resolve as resolve_fn, get_firm_panel
+        from lib.ingest import build_panel, build_contractors_panel, load_cci_annual
+        from lib.resolve import resolve_auto, get_firm_panel
         from lib.charts import build_composite_by_year
         from lib.research import load_research
         from lib.forecast import load_fmi_forecast
@@ -372,16 +382,16 @@ def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
             build_business_case_spec, render_business_case_docx,
         )
 
-        panel = build_panel(DATA_DIR / "enr")
+        design_panel = build_panel(DATA_DIR / "enr")
+        contractors_panel = build_contractors_panel(DATA_DIR / "enr")
         cci = load_cci_annual(DATA_DIR / "cci.xlsx", base_year=2025)
         cci_lookup = dict(zip(cci["year"], cci["deflator"]))
-        composite_by_year = build_composite_by_year(panel)
         fmi = load_fmi_forecast(DATA_DIR / "fmi_forecast.json")
         assumptions = load_pilot_assumptions(DATA_DIR / "revwin_pilot_assumptions.json")
 
         try:
-            match = resolve_fn(
-                panel, req.firm_name,
+            panel, match, _ = resolve_auto(
+                design_panel, contractors_panel, req.firm_name,
                 user_cache_path=DATA_DIR / "user_aliases.json",
                 interactive=False,
             )
@@ -390,6 +400,7 @@ def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
                        message=f"Firm '{req.firm_name}' not found in ENR data.")
             return
 
+        composite_by_year = build_composite_by_year(panel)
         firm_data = get_firm_panel(panel, match)
         if firm_data.empty:
             update_job(job_id, status="failed",
@@ -542,8 +553,8 @@ def discover_ma(req: MADiscoveryRequest, x_api_secret: Optional[str] = Header(No
     sys.path.insert(0, str(Path(__file__).parent / "lib"))
 
     try:
-        from lib.ingest import build_panel
-        from lib.resolve import resolve as resolve_fn
+        from lib.ingest import build_panel, build_contractors_panel
+        from lib.resolve import resolve_auto
         from lib.ma_discovery import (
             discover_acquisitions,
             verify_acquisitions,
@@ -553,12 +564,12 @@ def discover_ma(req: MADiscoveryRequest, x_api_secret: Optional[str] = Header(No
         )
 
         ma_cache_dir = DATA_DIR / "ma_cache"
-        panel = build_panel(DATA_DIR / "enr")
+        design_panel = build_panel(DATA_DIR / "enr")
+        contractors_panel = build_contractors_panel(DATA_DIR / "enr")
 
         try:
-            match = resolve_fn(
-                panel,
-                req.firm_name,
+            panel, match, _ = resolve_auto(
+                design_panel, contractors_panel, req.firm_name,
                 user_cache_path=DATA_DIR / "user_aliases.json",
                 interactive=False,
             )

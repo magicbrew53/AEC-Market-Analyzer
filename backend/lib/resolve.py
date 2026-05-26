@@ -114,6 +114,48 @@ BUILTIN_ALIASES: dict[str, list[str]] = {
     # Note: do NOT alias "urs" → ["URS", "AECOM"] because URS was acquired by AECOM in 2014.
     # Treat URS as historical-only.
     "urs": ["URS"],
+
+    # ---------- ENR 400 Contractors ----------
+    "turner": ["TURNER CONSTRUCTION"],
+    "turner construction": ["TURNER CONSTRUCTION"],
+    "whiting-turner": ["WHITING TURNER CONTRACTING"],
+    "whiting turner": ["WHITING TURNER CONTRACTING"],
+    "skanska": ["SKANSKA USA BUILDING", "SKANSKA USA CIVIL", "SKANSKA USA"],
+    "hensel phelps": ["HENSEL PHELPS CONSTRUCTION"],
+    "clark": ["CLARK CONSTRUCTION GROUP", "CLARK CONSTRUCTION"],
+    "dpr": ["DPR CONSTRUCTION"],
+    "pcl": ["PCL CONSTRUCTION ENTERPRISES"],
+    "mccarthy": ["MCCARTHY BUILDING COS", "MCCARTHY BUILDING COMPANIES"],
+    "gilbane": ["GILBANE BUILDING"],
+    "brasfield": ["BRASFIELD & GORRIE"],
+    "brasfield & gorrie": ["BRASFIELD & GORRIE"],
+    "mortenson": ["MORTENSON CONSTRUCTION", "M A MORTENSON"],
+    "barton malow": ["BARTON MALOW"],
+    "je dunn": ["JE DUNN CONSTRUCTION", "J E DUNN CONSTRUCTION"],
+    "suffolk": ["SUFFOLK CONSTRUCTION"],
+    "holder": ["HOLDER CONSTRUCTION"],
+    "ryan": ["RYAN COMPANIES US"],
+    "ryan companies": ["RYAN COMPANIES US"],
+    "structure tone": ["STRUCTURE TONE"],
+    "aecom hunt": ["AECOM HUNT"],
+    "hunt": ["AECOM HUNT", "HUNT CONSTRUCTION GROUP"],
+    "manhattan construction": ["MANHATTAN CONSTRUCTION GROUP"],
+    "webcor": ["WEBCOR BUILDERS"],
+    "pepper": ["PEPPER CONSTRUCTION GROUP"],
+    "tutor perini": ["TUTOR PERINI"],
+    "granite": ["GRANITE CONSTRUCTION"],
+    "granite construction": ["GRANITE CONSTRUCTION"],
+    "fluor": ["FLUOR"],
+    "foster wheeler": ["FOSTER WHEELER"],
+    "emcor": ["EMCOR GROUP"],
+    "quanta": ["QUANTA SERVICES"],
+    "mastec": ["MASTEC"],
+    "wm": ["WASTE MANAGEMENT"],
+    "aecom construction": ["AECOM CONSTRUCTION SERVICES"],
+    "ccc": ["CONSIGLI CONSTRUCTION"],
+    "consigli": ["CONSIGLI CONSTRUCTION"],
+    "barr & barr": ["BARR & BARR"],
+    "sterling": ["STERLING CONSTRUCTION"],
 }
 
 
@@ -319,6 +361,61 @@ def resolve(
             raise ValueError(f"User aborted resolution for '{user_input}'.")
         else:
             print(f"Please enter 1-{len(candidates)+1}.")
+
+
+def resolve_auto(
+    design_panel: pd.DataFrame,
+    contractors_panel: pd.DataFrame | None,
+    user_input: str,
+    user_cache_path: "Path | None" = None,
+    interactive: bool = True,
+    alias_overrides: "dict[str, list[str]] | None" = None,
+    force_list: str | None = None,
+) -> "tuple[pd.DataFrame, FirmMatch, str]":
+    """
+    Resolve a firm name against the right ENR panel automatically.
+
+    Try order (unless force_list overrides):
+      1. ENR 500 Design Firms panel
+      2. ENR 400 Contractors panel (if available and firm not found in ENR 500)
+
+    Returns (panel_used, match, list_name) where list_name is "enr500" or "enr400".
+
+    force_list: "enr500" or "enr400" to skip auto-detection.
+    """
+    if force_list == "enr400":
+        if contractors_panel is None or contractors_panel.empty:
+            raise ValueError("ENR 400 panel is not available.")
+        match = resolve(contractors_panel, user_input, user_cache_path=user_cache_path,
+                        interactive=interactive, alias_overrides=alias_overrides)
+        return (contractors_panel, match, "enr400")
+
+    if force_list == "enr500":
+        match = resolve(design_panel, user_input, user_cache_path=user_cache_path,
+                        interactive=interactive, alias_overrides=alias_overrides)
+        return (design_panel, match, "enr500")
+
+    # Auto: try ENR 500 first
+    try:
+        match = resolve(design_panel, user_input, user_cache_path=user_cache_path,
+                        interactive=False, alias_overrides=alias_overrides)
+        return (design_panel, match, "enr500")
+    except ValueError:
+        pass
+
+    # Fall back to ENR 400
+    if contractors_panel is not None and not contractors_panel.empty:
+        try:
+            match = resolve(contractors_panel, user_input, user_cache_path=user_cache_path,
+                            interactive=interactive, alias_overrides=alias_overrides)
+            return (contractors_panel, match, "enr400")
+        except ValueError:
+            pass
+
+    # Neither found — re-run ENR 500 with full interactive flow so user sees candidates
+    match = resolve(design_panel, user_input, user_cache_path=user_cache_path,
+                    interactive=interactive, alias_overrides=alias_overrides)
+    return (design_panel, match, "enr500")
 
 
 def get_firm_panel(panel: pd.DataFrame, match: FirmMatch) -> pd.DataFrame:
