@@ -447,13 +447,18 @@ def _read_file(path: Path) -> list[dict]:
 
 def build_panel(enr_dir: Path) -> pd.DataFrame:
     """
-    Read all ENR files in `enr_dir` and return a single normalized DataFrame.
+    Read all ENR 500 Design Firm files and return a single normalized DataFrame.
+
+    Looks for files in `enr_dir/ENR 500 Design/` (new layout) and falls back to
+    `enr_dir` directly for backward compatibility.
 
     Each row is one (edition_year, firm) observation.
     """
-    files = sorted(Path(enr_dir).glob("*.xlsx"))
+    design_subdir = Path(enr_dir) / "ENR 500 Design"
+    search_dir = design_subdir if design_subdir.is_dir() else Path(enr_dir)
+    files = sorted(search_dir.glob("*.xlsx"))
     if not files:
-        raise FileNotFoundError(f"No .xlsx files found in {enr_dir}")
+        raise FileNotFoundError(f"No .xlsx files found in {search_dir}")
 
     all_records: list[dict] = []
     for f in files:
