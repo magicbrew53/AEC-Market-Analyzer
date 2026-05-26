@@ -151,7 +151,10 @@ def _revenue_dual_axis(firm_data, composite_data, firm_short, sector_label, sect
         on="data_year", how="outer",
     ).sort_values("data_year").reset_index(drop=True)
 
-    if merged.empty or merged["data_year"].isna().all():
+    merged["firm"] = pd.to_numeric(merged["firm"], errors="coerce")
+    merged["comp"] = pd.to_numeric(merged["comp"], errors="coerce")
+
+    if merged.empty or merged["data_year"].isna().all() or merged["firm"].isna().all():
         _no_data_chart(out_path)
         return
 
@@ -269,6 +272,13 @@ def _yoy_paired_bars(firm_data, composite_data, firm_short, sector_label, sector
         on="data_year", how="outer",
     ).sort_values("data_year").reset_index(drop=True)
 
+    merged["firm"] = pd.to_numeric(merged["firm"], errors="coerce")
+    merged["comp"] = pd.to_numeric(merged["comp"], errors="coerce")
+
+    if merged.empty or merged["data_year"].isna().all() or merged["firm"].isna().all():
+        _no_data_chart(out_path)
+        return
+
     if deflate and cci_lookup:
         merged["firm"] = [
             v * cci_lookup.get(int(y), 1.0) if pd.notna(v) else v
@@ -348,7 +358,10 @@ def chart_market_share(firm_data, composite_data, firm_short, sector_label, sect
         on="data_year", how="outer",
     ).sort_values("data_year").reset_index(drop=True)
 
-    if merged.empty or merged["data_year"].isna().all():
+    merged["firm"] = pd.to_numeric(merged["firm"], errors="coerce")
+    merged["comp"] = pd.to_numeric(merged["comp"], errors="coerce")
+
+    if merged.empty or merged["data_year"].isna().all() or merged["firm"].isna().all():
         _no_data_chart(out_path)
         return
 
