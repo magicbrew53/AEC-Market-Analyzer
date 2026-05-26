@@ -2,7 +2,8 @@ import fs from "fs";
 import path from "path";
 import { createReadStream, statSync } from "fs";
 
-const BLOB_TOKEN = "vercel_blob_rw_VLKgBkoVeGNwSGjf_NvUNx4uoxzrymRBvq4jgqFJtDy7dfB";
+const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+if (!BLOB_TOKEN) { console.error("ERROR: BLOB_READ_WRITE_TOKEN env var not set"); process.exit(1); }
 const DATA_DIR = "./backend/data";
 
 const CONTENT_TYPES = {
