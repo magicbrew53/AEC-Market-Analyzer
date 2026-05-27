@@ -128,7 +128,7 @@ def run_pipeline(job_id: str, req: GenerateRequest):
         )
 
         start_year, end_year = req.span_start, req.span_end
-        base_year = req.base_year
+        base_year = min(req.base_year, 2025)  # CCI data only goes to 2025
 
         # --- Load data ---
         update_job(job_id, progress=8, message="Loading ENR panels...")
