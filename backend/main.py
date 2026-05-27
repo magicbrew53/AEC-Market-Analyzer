@@ -55,7 +55,7 @@ def require_auth(x_api_secret: Optional[str]):
 class GenerateRequest(BaseModel):
     firm_name: str
     span_start: int = 2005
-    span_end: int = 2025
+    span_end: int = 2026
     base_year: int = 2025
     no_narrative: bool = False
     no_forecast: bool = False
@@ -408,7 +408,7 @@ def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
             return
 
         actual_start = max(2005, int(firm_data["data_year"].min()))
-        actual_end = min(2025, int(firm_data["data_year"].max()))
+        actual_end = min(2026, int(firm_data["data_year"].max()))
         firm_short = match.firm_keys[0] if match.firm_keys else req.firm_name.upper()
 
         research = load_research(DATA_DIR / "research" / f"{firm_short}.json")

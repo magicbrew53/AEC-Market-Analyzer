@@ -60,6 +60,18 @@ input[type="text"] {
 }
 input[type="text"]:focus { border-color: var(--brand-light); }
 
+select {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  background: #fff;
+  cursor: pointer;
+}
+select:focus { border-color: var(--brand-light); }
+
 .options-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

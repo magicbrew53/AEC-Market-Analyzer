@@ -83,7 +83,7 @@ export default function Home() {
 
   // Market Analysis options
   const [spanStart, setSpanStart] = useState(2005);
-  const [spanEnd, setSpanEnd] = useState(2025);
+  const [spanEnd, setSpanEnd] = useState(2026);
   const [baseYear, setBaseYear] = useState(2025);
   const [noNarrative, setNoNarrative] = useState(false);
   const [noForecast, setNoForecast] = useState(false);
@@ -317,7 +317,7 @@ export default function Home() {
                       id="spanEnd"
                       type="number"
                       min={spanStart + 1}
-                      max={2025}
+                      max={2026}
                       value={spanEnd}
                       onChange={(e) => setSpanEnd(Number(e.target.value))}
                       disabled={loading}
