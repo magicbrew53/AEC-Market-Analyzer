@@ -270,6 +270,19 @@ def build_business_case_spec(
            else "This is the path to gaining ground in a sector where the firm currently does not.")
     )
 
+    primary = bc.sector_pick.primary
+    enr_comparison = {
+        "firmCagrPct": _fmt_pct(primary.firm_real_cagr_pct),
+        "compositeCagrPct": _fmt_pct(primary.composite_real_cagr_pct),
+        "deltaPp": (
+            f"{primary.delta_pp:+.1f} pp"
+            if primary.delta_pp is not None else "—"
+        ),
+        "deltaIsNegative": (primary.delta_pp or 0) < 0,
+        "spanStart": primary.facts.start_year,
+        "spanEnd": primary.facts.end_year,
+    }
+
     return {
         "meta": {
             "firmShort":        bc.firm_short,
@@ -282,6 +295,7 @@ def build_business_case_spec(
             "hasExplicitTarget": ag.has_explicit_target,
         },
         "headerTable": header_table,
+        "enrComparison": enr_comparison,
         "askCallout": {
             "title": "The Ask",
             "body": (
@@ -529,6 +543,40 @@ allChildren.push(new Paragraph({
     children: cols.map(c => plainCell(c.value, {
       bold: true,
       color: c.highlight ? NET_NEW_GREEN : ACCENT,
+      align: AlignmentType.CENTER, width: w, fontSize: 22, bg: 'FAFAFA',
+    })),
+  });
+
+  allChildren.push(new Table({
+    width: { size: CONTENT_WIDTH, type: WidthType.DXA },
+    columnWidths: cols.map(() => w),
+    rows: [headerRow, valueRow],
+  }));
+  allChildren.push(P(' ', { run: { size: 14 } }));
+})();
+
+// ---------- ENR Composite comparison strip ----------
+
+(function () {
+  const ec = spec.enrComparison;
+  const NEGATIVE_RED = 'C0392B';
+  const cols = [
+    { label: `${ec.spanStart}–${ec.spanEnd} Firm Real CAGR`, value: ec.firmCagrPct, highlight: false },
+    { label: 'ENR Composite Real CAGR', value: ec.compositeCagrPct, highlight: false },
+    { label: 'vs. ENR Composite', value: ec.deltaPp, highlight: ec.deltaIsNegative },
+  ];
+  const w = Math.floor(CONTENT_WIDTH / cols.length);
+
+  const headerRow = new TableRow({
+    children: cols.map(c => plainCell(c.label, {
+      bold: true, color: TABLE_HEADER_TEXT, bg: TABLE_HEADER_BG,
+      align: AlignmentType.CENTER, width: w, fontSize: 16,
+    })),
+  });
+  const valueRow = new TableRow({
+    children: cols.map(c => plainCell(c.value, {
+      bold: true,
+      color: c.highlight ? NEGATIVE_RED : ACCENT,
       align: AlignmentType.CENTER, width: w, fontSize: 22, bg: 'FAFAFA',
     })),
   });

@@ -295,14 +295,23 @@ def rank_sectors(
         except Exception:
             continue
 
-        if facts.end_nom_m is None or facts.end_share is None:
-            continue
-        if facts.real_cagr_pct is None or facts.comp_real_cagr_pct is None:
-            continue
-
-        passes_filter = (facts.end_nom_m >= min_rev and facts.end_share >= min_share)
-        if not passes_filter and sector_key not in always_include_set:
-            continue
+        if sector_key in always_include_set:
+            # Forced sector: raise clearly rather than silently dropping it.
+            if (facts.end_nom_m is None or facts.end_share is None
+                    or facts.real_cagr_pct is None or facts.comp_real_cagr_pct is None):
+                raise ValueError(
+                    f"Sector '{sector_key}' was selected but {firm_short} has no ENR "
+                    f"revenue data in this sector. Choose a different sector or use auto-pick."
+                )
+            # Size/share filter is bypassed — fall through to add to candidates.
+        else:
+            if facts.end_nom_m is None or facts.end_share is None:
+                continue
+            if facts.real_cagr_pct is None or facts.comp_real_cagr_pct is None:
+                continue
+            passes_filter = (facts.end_nom_m >= min_rev and facts.end_share >= min_share)
+            if not passes_filter:
+                continue
 
         delta_pp = facts.real_cagr_pct - facts.comp_real_cagr_pct
         candidates.append(SectorCandidate(

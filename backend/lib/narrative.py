@@ -395,8 +395,11 @@ size (`market_projection.end_year_m`) to the {target_year} size (`market_project
   - If `active_growth.has_explicit_target` is true, state the target_revenue_m as the \
 {target_year} goal and the net_new_required_m as what must be added to get there.
   - If `active_growth.has_explicit_target` is false, frame the opportunity as participating \
-in a funded market without gaining ground in real terms — quantify the real-CAGR gap from \
-`primary_sector.delta_pp` (and secondary_sector.delta_pp when bundled).
+in a funded market without gaining ground in real terms — cite the firm's real CAGR \
+(`primary_sector.firm_real_cagr_pct`%) and the **ENR Composite** real CAGR \
+(`primary_sector.composite_real_cagr_pct`%) by name, then state the gap \
+(`primary_sector.delta_pp` pp) in percentage points. For bundled sectors use \
+secondary_sector values too.
   - Conclude with: this is achievable through consistent capture-planning execution at \
 pursuit volume, not occasional must-win heroics.
 
@@ -428,9 +431,11 @@ any sector picked — pursuit-planning lift compounds where the firm runs a stea
 of similar pursuits with similar buyers.
 
   2. **Stabilized but not-yet-gaining share — clean measurement baseline.** Use this when \
-`primary_sector.delta_pp` is small in magnitude (within ~1.0pp of zero). The firm is \
-neither gaining nor losing ground in real terms, which makes any pilot lift cleanly \
-attributable to the methodology rather than a sector tailwind.
+`primary_sector.delta_pp` is small in magnitude (within ~1.0pp of zero). State the firm's \
+real CAGR (`primary_sector.firm_real_cagr_pct`%) against the **ENR Composite** real CAGR \
+(`primary_sector.composite_real_cagr_pct`%) explicitly — the firm is tracking the composite \
+closely, which makes any pilot lift cleanly attributable to the methodology rather than a \
+sector tailwind.
 
   3. **Imminent acquisition or expansion cycle.** Use ONLY if the research notes (visible \
 in the facts via the parent prompt — but you do not have that here) clearly establish a \

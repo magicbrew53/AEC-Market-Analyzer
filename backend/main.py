@@ -440,7 +440,7 @@ def run_business_case_pipeline(job_id: str, req: BusinessCaseRequest):
                 pilot_duration_quarters_override=req.pilot_duration_quarters,
             )
         except ValueError as e:
-            update_job(job_id, status="failed", message=str(e))
+            update_job(job_id, status="failed", message=str(e), error=str(e))
             return
 
         # --- Narratives (3 LLM calls) ---
