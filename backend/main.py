@@ -193,10 +193,20 @@ def run_pipeline(job_id: str, req: GenerateRequest):
         update_job(job_id, progress=40, message="Rendering charts (60 total)...")
         chart_dir = OUTPUT_DIR / f"_{job_id}_charts"
         chart_dir.mkdir(exist_ok=True)
+
+        # Filter to the user-requested span before charting. compute_section_facts()
+        # filters internally, so the unfiltered originals are preserved above for that path.
+        firm_data_span = firm_data[
+            (firm_data["data_year"] >= actual_start) & (firm_data["data_year"] <= actual_end)
+        ].copy()
+        composite_span = composite_by_year[
+            (composite_by_year["data_year"] >= actual_start) & (composite_by_year["data_year"] <= actual_end)
+        ].copy()
+
         section_chart_paths = {}
         for sector_key, sector_label, facts in section_facts:
             paths = render_sector_charts(
-                firm_data=firm_data, composite_by_year=composite_by_year,
+                firm_data=firm_data_span, composite_by_year=composite_span,
                 firm_short=firm_short, sector_label=sector_label, sector_key=sector_key,
                 last_actual_year=actual_end, forecast_year=forecast_year,
                 output_dir=chart_dir, cci_lookup=cci_lookup,
